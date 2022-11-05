@@ -1,3 +1,33 @@
+class IO{
+
+    register = new Uint8Array(0x80);
+	
+	init(mmu, cpu, ppu) {
+		this.mmu = mmu;
+		this.cpu = cpu;
+		this.ppu = ppu;
+	}
+
+	write8(address, value) {
+		switch (address & 0xFF) {
+		case 0x47: this.ppu.updatePalette(value & 0xFF); break;
+		case 0x50: this.mmu.loadRom(mmu.romPath); break;
+		default:
+			this.register[address & 0x7F] = (value & 0xFF);
+			break;
+		}
+	}
+	
+	read8(address) {
+		switch(address & 0xFF)
+		{
+			default: return this.register[address & 0x7F] & 0xFF;
+		}
+	}
+}
+
+io = new IO();
+
 class MMU {
     constructor() {
         this.bios = [
@@ -18,6 +48,10 @@ class MMU {
 
         this.romBank0 = [...this.bios];
     };
+
+    init(io){
+        this.io = io;
+    }
 
     read8(address) {
 
@@ -79,14 +113,14 @@ class MMU {
 
 mmu = new MMU();
 
-const a = 'a';
-const b = 'b';
-const c = 'c';
-const d = 'd';
-const e = 'e';
-const f = 'f';
-const h = 'h';
-const l = 'l';
+const A = 'A';
+const B = 'B';
+const C = 'C';
+const D = 'D';
+const E = 'E';
+const F = 'F';
+const H = 'H';
+const L = 'L';
 const af = 'AF';
 const bc = 'BC';
 const de = 'DE';
@@ -142,23 +176,26 @@ class CPU {
     // writeR = (register, value) => this.reg[register] = value;
     // readR = (register) => this.reg[register];
     decR = (register) => {
-        tmp = this.reg[register] - 1;
-        setFlag(ZERO, (tmp & 0xFF) === 0);
-        setFlag(NEGATIVE, true);
-        setFlag(HALF_CARRY, ((((tmp & 0xf) - (this.reg[register] & 0xf)) & 0x10) < 0));
+        let tmp = this.reg[register] - 1;
+        this.setFlag(ZERO, (tmp & 0xFF) === 0);
+        this.setFlag(NEGATIVE, true);
+        this.setFlag(HALF_CARRY, ((((tmp & 0xf) - (this.reg[register] & 0xf)) & 0x10) < 0));
         this.reg[register] = tmp & 0xFF;
     }
 
-    decRP = (registerPair) => { this.reg[registerPair]--}
+    incR(register) {
+		let tmp = cpu.reg[register] + 1;
+		this.setFlag(ZERO, (tmp & 0xFF) == 0);
+		this.setFlag(NEGATIVE, false);
+		this.setFlag(HALF_CARRY, ((((tmp & 0xf) + (cpu.reg[register] & 0xf)) & 0x10) === 0x10));
+		cpu.reg[register]= tmp & 0xFF;
+	}
 
     setFlag(bit, condition) {
 		this.reg.F = (this.reg.F & ~(1 << bit)) | (condition << bit);
 	};
     setFlags(z, n, h, c){
     }
-
-    // nextByte = () => this.mmu.bios[this.reg.PC++];
-    // nextWord = () => this.mmu.bios[this.reg.PC++] | this.mmu.bios[this.reg.PC++] << 8;
 
     jmpCond(condition){
         let offset = bus.next8();
@@ -174,29 +211,131 @@ class CPU {
     };
 
     cbBit = (bitPos, u8) => {
-        this.setFlag(ZERO, u8 & (1 << bitPos) === 0x00);
+        let bit = !(u8 >> bitPos ) & 0x1;
+        this.setFlag(ZERO, bit);
         this.setFlag(NEGATIVE, false);
         this.setFlag(HALF_CARRY, true);
     }
     tick() {
         this.OC = bus.next8();
-        console.log(this.OC.toString(16));
         this.instructions[this.OC]();
     }
 
     instructions = {
         0x00: () => this.m = 1,
 
-        0x20: () => {this.jmpCond((this.reg.F & 0x80) !== 0x80)},
-        0x01: () => { cpu.reg.BC = bus.next16(); this.m = 3 },
-        0x11: () => { cpu.reg.DE = bus.next16(); this.m = 3 },
-        0x21: () => { cpu.reg.HL = bus.next16(); this.m = 3 },
-        0x31: () => { cpu.reg.SP = bus.next16(); this.m = 3 },
+        0x20: () => {this.jmpCond((this.reg.F & 0x80) === 0x00)},
 
-        0x02: () => { cpu.reg._BC_ = cpu.reg.A; this.m = 2 },
-        0x12: () => { cpu.reg._DE_ = cpu.reg.A; this.m = 2 },
-        0x22: () => { cpu.reg._HL_ = cpu.reg.A; cpu.reg.HL++; this.m = 2 },
-        0x32: () => { cpu.reg._HL_ = cpu.reg.A; cpu.reg.HL--; this.m = 2 },
+        0x04: () => {this.incR(B); this.m = 1},
+        0x0C: () => {this.incR(C); this.m = 1},
+        0x14: () => {this.incR(D); this.m = 1},
+        0x1C: () => {this.incR(E); this.m = 1},
+        0x24: () => {this.incR(H); this.m = 1},
+        0x2C: () => {this.incR(L); this.m = 1},
+        0x34: () => {this.incR(_HL_); this.m = 3},
+        0x3C: () => {this.incR(A); this.m = 1},
+
+        0x05: () => {this.decR(B); this.m = 1},
+        0x0D: () => {this.decR(C); this.m = 1},
+        0x15: () => {this.decR(D); this.m = 1},
+        0x1D: () => {this.decR(E); this.m = 1},
+        0x25: () => {this.decR(H); this.m = 1},
+        0x2D: () => {this.decR(L); this.m = 1},
+        0x35: () => {this.decR(_HL_); this.m = 3},
+        0x3D: () => {this.decR(A); this.m = 1},
+
+        0x01: () => { this.reg.BC = bus.next16(); this.m = 3 },
+        0x11: () => { this.reg.DE = bus.next16(); this.m = 3 },
+        0x21: () => { this.reg.HL = bus.next16(); this.m = 3 },
+        0x31: () => { this.reg.SP = bus.next16(); this.m = 3 },
+
+        0x02: () => { this.reg._BC_ = this.reg.A; this.m = 2 },
+        0x12: () => { this.reg._DE_ = this.reg.A; this.m = 2 },
+        0x22: () => { this.reg._HL_ = this.reg.A; this.reg.HL++; this.m = 2 },
+        0x32: () => { this.reg._HL_ = this.reg.A; this.reg.HL--; this.m = 2 },
+
+        0x06: () => {this.reg.B = bus.next8(); this.m = 2},
+        0x0E: () => {this.reg.C = bus.next8(); this.m = 2},
+        0x16: () => {this.reg.D = bus.next8(); this.m = 2},
+        0x1E: () => {this.reg.E = bus.next8(); this.m = 2},
+        0x26: () => {this.reg.H = bus.next8(); this.m = 2},
+        0x2E: () => {this.reg.L = bus.next8(); this.m = 2},
+        0x36: () => {this.reg._HL_ = bus.next8(); this.m = 3},
+        0x3E: () => {this.reg.A = bus.next8(); this.m = 2},
+
+        0x40: () => { this.reg.B = this.reg.B; this.m = 1 },
+        0x41: () => { this.reg.B = this.reg.C; this.m = 1 },
+        0x42: () => { this.reg.B = this.reg.D; this.m = 1 },
+        0x43: () => { this.reg.B = this.reg.E; this.m = 1 },
+        0x44: () => { this.reg.B = this.reg.H; this.m = 1 },
+        0x45: () => { this.reg.B = this.reg.L; this.m = 1 },
+        0x46: () => { this.reg.B = this.reg._HL_; this.m = 2 },
+        0x47: () => { this.reg.B = this.reg.A; this.m = 1 },
+
+        0x48: () => { this.reg.C = this.reg.B; this.m = 1 },
+        0x49: () => { this.reg.C = this.reg.C; this.m = 1 },
+        0x4A: () => { this.reg.C = this.reg.D; this.m = 1 },
+        0x4B: () => { this.reg.C = this.reg.E; this.m = 1 },
+        0x4C: () => { this.reg.C = this.reg.H; this.m = 1 },
+        0x4D: () => { this.reg.C = this.reg.L; this.m = 1 },
+        0x4E: () => { this.reg.C = this.reg._HL_; this.m = 2 },
+        0x4F: () => { this.reg.C = this.reg.A; this.m = 1 },
+
+        0x50: () => { this.reg.D = this.reg.B; this.m = 1 },
+        0x51: () => { this.reg.D = this.reg.C; this.m = 1 },
+        0x52: () => { this.reg.D = this.reg.D; this.m = 1 },
+        0x53: () => { this.reg.D = this.reg.E; this.m = 1 },
+        0x54: () => { this.reg.D = this.reg.H; this.m = 1 },
+        0x55: () => { this.reg.D = this.reg.L; this.m = 1 },
+        0x56: () => { this.reg.D = this.reg._HL_; this.m = 2 },
+        0x57: () => { this.reg.D = this.reg.A; this.m = 1 },
+
+        0x58: () => { this.reg.E = this.reg.B; this.m = 1 },
+        0x59: () => { this.reg.E = this.reg.C; this.m = 1 },
+        0x5A: () => { this.reg.E = this.reg.D; this.m = 1 },
+        0x5B: () => { this.reg.E = this.reg.E; this.m = 1 },
+        0x5C: () => { this.reg.E = this.reg.H; this.m = 1 },
+        0x5D: () => { this.reg.E = this.reg.L; this.m = 1 },
+        0x5E: () => { this.reg.E = this.reg._HL_; this.m = 2 },
+        0x5F: () => { this.reg.E = this.reg.A; this.m = 1 },
+
+        0x60: () => { this.reg.H = this.reg.B; this.m = 1 },
+        0x61: () => { this.reg.H = this.reg.C; this.m = 1 },
+        0x62: () => { this.reg.H = this.reg.D; this.m = 1 },
+        0x63: () => { this.reg.H = this.reg.E; this.m = 1 },
+        0x64: () => { this.reg.H = this.reg.H; this.m = 1 },
+        0x65: () => { this.reg.H = this.reg.L; this.m = 1 },
+        0x66: () => { this.reg.H = this.reg._HL_; this.m = 2 },
+        0x67: () => { this.reg.H = this.reg.A; this.m = 1 },
+
+        0x68: () => { this.reg.L = this.reg.B; this.m = 1 },
+        0x69: () => { this.reg.L = this.reg.C; this.m = 1 },
+        0x6A: () => { this.reg.L = this.reg.D; this.m = 1 },
+        0x6B: () => { this.reg.L = this.reg.E; this.m = 1 },
+        0x6C: () => { this.reg.L = this.reg.H; this.m = 1 },
+        0x6D: () => { this.reg.L = this.reg.L; this.m = 1 },
+        0x6E: () => { this.reg.L = this.reg._HL_; this.m = 2 },
+        0x6F: () => { this.reg.L = this.reg.A; this.m = 1 },
+
+        0x70: () => { this.reg._HL_ = this.reg.B; this.m = 1 },
+        0x71: () => { this.reg._HL_= this.reg.C; this.m = 1 },
+        0x72: () => { this.reg._HL_ = this.reg.D; this.m = 1 },
+        0x73: () => { this.reg._HL_ = this.reg.E; this.m = 1 },
+        0x74: () => { this.reg._HL_ = this.reg.H; this.m = 1 },
+        0x75: () => { this.reg._HL_ = this.reg.L; this.m = 1 },
+        // 0x76: () => { this.reg._HL_ = this.reg._HL_; this.m = 2 },
+        0x77: () => { this.reg._HL_ = this.reg.A; this.m = 1 },
+
+        0x78: () => { this.reg.A = this.reg.B; this.m = 1 },
+        0x79: () => { this.reg.A = this.reg.C; this.m = 1 },
+        0x7A: () => { this.reg.A = this.reg.D; this.m = 1 },
+        0x7B: () => { this.reg.A = this.reg.E; this.m = 1 },
+        0x7C: () => { this.reg.A = this.reg.H; this.m = 1 },
+        0x7D: () => { this.reg.A = this.reg.L; this.m = 1 },
+        0x7E: () => { this.reg.A = this.reg._HL_; this.m = 2 },
+        0x7F: () => { this.reg.A = this.reg.A; this.m = 1 },
+
+        0xE2: () => { this.bus.write8(0xFF00 + this.reg.C, this.reg.A); this.m = 2},
 
         0xA8: () => { this.xor(this.reg.B); this.m = 1 },
         0xA9: () => { this.xor(this.reg.C); this.m = 1 },
@@ -208,6 +347,7 @@ class CPU {
         0xAF: () => { this.xor(this.reg.A); this.m = 1 },
 
         0xCB: () => this.cbInstructions[this.bus.next8()](),
+        default:() => {console.log("Instruction not implemented: " + this.OC)}
     };
 
     cbInstructions = {
@@ -380,7 +520,8 @@ bus = new Bus();
 
 bus.init(cpu, mmu, ppu);
 cpu.init(mmu, bus);
-
+io.init(mmu, cpu, ppu);
+mmu.init(io);
 
 function updateDebug() {
     document.getElementById("pc").innerHTML = `PC: ${cpu.reg.PC.toString(16)}`;
@@ -390,10 +531,10 @@ function updateDebug() {
     document.getElementById("hl").innerHTML = 'HL: ' + cpu.reg.HL.toString(16);
     document.getElementById("sp").innerHTML = 'SP: ' + cpu.reg.SP.toString(16);
 
-    document.getElementById("zero").checked = (cpu.reg.f & 0x80) === 0x80;
-    document.getElementById("negative").checked = (cpu.reg.f & 0x40) === 0x40;
-    document.getElementById("halfcarry").checked = (cpu.reg.f & 0x20) === 0x20;
-    document.getElementById("carry").checked = (cpu.reg.f & 0x10) === 0x10;
+    document.getElementById("zero").checked = (cpu.reg.F & 0x80) === 0x80;
+    document.getElementById("negative").checked = (cpu.reg.F & 0x40) === 0x40;
+    document.getElementById("halfcarry").checked = (cpu.reg.F & 0x20) === 0x20;
+    document.getElementById("carry").checked = (cpu.reg.F & 0x10) === 0x10;
 };
 
 function tick() {
@@ -401,6 +542,12 @@ function tick() {
     updateDebug();
 }
 
+running = true;
+
 function run(){
-    while()
+    while(running){
+        cpu.tick();
+        console.log(`PC: ${cpu.reg.PC.toString(16)} OC: ${cpu.OC.toString(16)} HL: ${cpu.reg.HL.toString(16)}`);
+    }
+    // updateDebug();
 }
