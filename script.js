@@ -9,8 +9,72 @@ class MMU {
             0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC, 0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E, 0x3C, 0x42, 0xB9, 0xA5, 0xB9, 0xA5, 0x42, 0x3C, 0x21, 0x04, 0x01, 0x11, 0xA8, 0x00, 0x1A, 0x13, 0xBE, 0x20, 0xFE, 0x23, 0x7D, 0xFE, 0x34, 0x20,
             0xF5, 0x06, 0x19, 0x78, 0x86, 0x23, 0x05, 0x20, 0xFB, 0x86, 0x20, 0xFE, 0x3E, 0x01, 0xE0, 0x50, 0x00
         ];
-        // romBank00;
+
+        this.romBank0 = new Uint8Array(0x4000);
+        this.romBankN = new Uint8Array(0x4000);
+        this.wRam = new Uint8Array(0x2000);
+        this.oam = new Uint8Array(0xA0);
+        this.hram = new Uint8Array(0x80);
+
+        this.romBank0 = [...this.bios];
     };
+
+    read8(address) {
+
+        switch ((address & 0xFFFF) >> 12) {
+            case 0: case 1: case 2: case 3:
+                return this.romBank0[address & 0x3FFF] & 0xFF;
+            case 4: case 5: case 6: case 7:
+                return this.romBankN[address & 0x3FFF] & 0xFF;
+            case 0xC: case 0xD:
+                return this.wRam[address & 0x1FFF] & 0xFF;
+            case 0xF:
+                switch ((address >> 4) & 0xF) {
+                    case 0: case 1: case 2: case 3: case 4: case 5: case 6: case 7:
+                        return this.io.read8(address);
+                    case 8: case 9: case 0xA: case 0xB: case 0xC: case 0xD: case 0xE: case 0xF:
+                        return this.hram[0x7F & address] & 0xFF;
+                }
+                return 0;
+            default:
+                console.log("Area not implemented: %04x\n", address);
+                return 0;
+        }
+    }
+
+    write8(address, value) {
+		switch ((address & 0xFFFF) >> 12) {
+		case 0: case 1: case 2: case 3:
+			//romBank0[address & 0x3FFF] = (byte) (value & 0xFF);
+			break;
+		case 4: case 5: case 6: case 7:
+			//romBank0[address & 0x3FFF] = (byte) (value & 0xFF);
+			break;
+		case 0xC: case 0xD:
+			this.wRam[address & 0x1FFF] = (value & 0xFF);
+			break;
+		case 0xF:
+			switch((address >> 8) & 0xF){
+			case 0xE:
+					this.oam[0x9F & address] = (value & 0xFF);
+					 break;
+			case 0xF:
+				switch((address >> 4) & 0xF) {
+				case 0: case 1: case 2: case 3: case 4: case 5: case 6: case 7:
+					this.io.write8(address, value);
+					break;
+				case 8: case 9: case 0xA: case 0xB: case 0xC: case 0xD: case 0xE: case 0xF:
+					this.hram[0x7F & address] = (value & 0xFF);
+					break;
+				}
+				break;
+			}
+			break;
+		default:
+			console.log("Area not implemented: %04x\n", address);
+			break;
+		}
+	}
 };
 
 mmu = new MMU();
@@ -35,102 +99,308 @@ const CARRY = 4;
 
 class CPU {
     constructor() {
-        this.mmu = mmu;
-        this.OC = 0;
+        this.m = 0; // M Cycles;
+        this.totalCycles = 0;
     };
 
+    init(mmu, bus){
+        this.mmu = mmu;
+        this.bus = bus;
+    }
+
     reg = {
-        a: 0,
-        b: 0,
-        c: 0,
-        d: 0,
-        e: 0,
-        f: 0,
-        h: 0,
-        l: 0,
+        A: 0,
+        B: 0,
+        C: 0,
+        D: 0,
+        E: 0,
+        F: 0,
+        H: 0,
+        L: 0,
         SP: 0,
         PC: 0,
 
-        // get A() { return this.a},
-        // set A(u8) { this.a = u8 },
+        get AF() { return this.A << 8 | this.F },
+        set AF(u16) { [this.F, this.A] = [(u16 & 0xFF), (u16 >> 8)] },
+        get BC() { return this.B << 8 | this.C },
+        set BC(u16) { [this.C, this.B] = [(u16 & 0xFF), (u16 >> 8)] },
+        get DE() { return this.D << 8 | this.E },
+        set DE(u16) { [this.E, this.D] = [(u16 & 0xFF), (u16 >> 8)] },
+        get HL() { return this.H << 8 | this.L },
+        set HL(u16) { [this.L, this.H] = [(u16 & 0xFF), (u16 >> 8)] },
 
-        // get B() { return this.b },
-        // set B(u8) { this.b = u8 },
-
-        // set C(u8) { this.c = u8 },
-        // get C() { return this.c },
-
-        // get D() { return this.d },
-        // set D(u8) { this.d = u8 },
-
-        // get E() { return this.e },
-        // set E(u8) { this.e = u8 },
-
-        // get H() { return this.h },
-        // set H(u8) { this.h = value },
-
-        // get L() { return this.l },
-        // set L(u8) { this.l = u8 },
-
-        get AF() { return this.a << 8 | this.f },
-        set AF(u16) { [this.f, this.a] = [(u16 & 0xFF), (u16 >> 8)] },
-        get BC() { return this.b << 8 | this.c },
-        set BC(u16) { [this.c, this.b] = [(u16 & 0xFF), (u16 >> 8)] },
-        get DE() { return this.d << 8 | this.e },
-        set DE(u16) { [this.e, this.d] = [(u16 & 0xFF), (u16 >> 8)] },
-        get HL() { return this.h << 8 | this.l },
-        set HL(u16) { [this.l, this.h] = [(u16 & 0xFF), (u16 >> 8)] },
+        get _AF_() { return this.A << 8 | this.F },
+        set _AF_(u16) { [this.F, this.A] = [(u16 & 0xFF), (u16 >> 8)] },
+        get _BC_() { return this.B << 8 | this.C },
+        set _BC_(u16) { [this.C, this.B] = [(u16 & 0xFF), (u16 >> 8)] },
+        get _DE_() { return this.D << 8 | this.E },
+        set _DE_(u16) { [this.E, this.D] = [(u16 & 0xFF), (u16 >> 8)] },
+        get _HL_() { return bus.read8(this.HL)},
+        set _HL_(u8) { bus.write8(this.HL, u8)},
     };
 
-    writeR = (register, value) => this.reg[register] = value;
-    readR = (register) => this.reg[register];
+    // writeR = (register, value) => this.reg[register] = value;
+    // readR = (register) => this.reg[register];
+    decR = (register) => {
+        tmp = this.reg[register] - 1;
+        setFlag(ZERO, (tmp & 0xFF) === 0);
+        setFlag(NEGATIVE, true);
+        setFlag(HALF_CARRY, ((((tmp & 0xf) - (this.reg[register] & 0xf)) & 0x10) < 0));
+        this.reg[register] = tmp & 0xFF;
+    }
+
+    decRP = (registerPair) => { this.reg[registerPair]--}
 
     setFlag(bit, condition) {
-		this.reg.f = (this.reg.f & ~(1 << bit)) | (condition << bit);
+		this.reg.F = (this.reg.F & ~(1 << bit)) | (condition << bit);
 	};
+    setFlags(z, n, h, c){
+    }
 
-    nextByte = () => this.mmu.bios[this.reg.PC++];
-    nextWord = () => this.mmu.bios[this.reg.PC++] | this.mmu.bios[this.reg.PC++] << 8;
+    // nextByte = () => this.mmu.bios[this.reg.PC++];
+    // nextWord = () => this.mmu.bios[this.reg.PC++] | this.mmu.bios[this.reg.PC++] << 8;
 
-    xor = (u8) => { this.reg.a ^= u8 & 0xFF
-                    this.reg.f  = ( u8 === 0) ? 0x80 : 0x00};
+    jmpCond(condition){
+        let offset = bus.next8();
+		if (condition) {
+			this.reg.PC += (offset > 127) ? (offset & 0x7F) - 128 : offset & 0x7F;
+			this.m = 3;
+		}
+		this.m = 2;
+    }
+    xor = (u8) => {
+        this.reg.A ^= u8 & 0xFF;
+        this.reg.F = (this.reg.A === 0) ? 0x80 : 0x00
+    };
 
+    cbBit = (bitPos, u8) => {
+        this.setFlag(ZERO, u8 & (1 << bitPos) === 0x00);
+        this.setFlag(NEGATIVE, false);
+        this.setFlag(HALF_CARRY, true);
+    }
     tick() {
-        this.OC = this.nextByte();
+        this.OC = bus.next8();
         console.log(this.OC.toString(16));
         this.instructions[this.OC]();
     }
 
     instructions = {
-        0x00: () => console.log('NOP'),
-        0x21: () => { cpu.reg.HL = this.nextWord()},
-        0x31: () => { cpu.reg.SP = this.nextWord()},
-        0xAF: () => this.xor(this.reg.a),
+        0x00: () => this.m = 1,
+
+        0x20: () => {this.jmpCond((this.reg.F & 0x80) !== 0x80)},
+        0x01: () => { cpu.reg.BC = bus.next16(); this.m = 3 },
+        0x11: () => { cpu.reg.DE = bus.next16(); this.m = 3 },
+        0x21: () => { cpu.reg.HL = bus.next16(); this.m = 3 },
+        0x31: () => { cpu.reg.SP = bus.next16(); this.m = 3 },
+
+        0x02: () => { cpu.reg._BC_ = cpu.reg.A; this.m = 2 },
+        0x12: () => { cpu.reg._DE_ = cpu.reg.A; this.m = 2 },
+        0x22: () => { cpu.reg._HL_ = cpu.reg.A; cpu.reg.HL++; this.m = 2 },
+        0x32: () => { cpu.reg._HL_ = cpu.reg.A; cpu.reg.HL--; this.m = 2 },
+
+        0xA8: () => { this.xor(this.reg.B); this.m = 1 },
+        0xA9: () => { this.xor(this.reg.C); this.m = 1 },
+        0xAA: () => { this.xor(this.reg.D); this.m = 1 },
+        0xAB: () => { this.xor(this.reg.E); this.m = 1 },
+        0xAC: () => { this.xor(this.reg.H); this.m = 1 },
+        0xAD: () => { this.xor(this.reg.L); this.m = 1 },
+        0xAE: () => { this.xor(this.reg._HL_); this.m = 2 },
+        0xAF: () => { this.xor(this.reg.A); this.m = 1 },
+
+        0xCB: () => this.cbInstructions[this.bus.next8()](),
     };
 
+    cbInstructions = {
+        0x40: () => { this.cbBit(0, this.reg.B); this.m = 3 },
+        0x41: () => { this.cbBit(0, this.reg.C); this.m = 3 },
+        0x42: () => { this.cbBit(0, this.reg.D); this.m = 3 },
+        0x43: () => { this.cbBit(0, this.reg.E); this.m = 3 },
+        0x44: () => { this.cbBit(0, this.reg.H); this.m = 3 },
+        0x45: () => { this.cbBit(0, this.reg.L); this.m = 3 },
+        0x46: () => { this.cbBit(0, this.reg._HL_); this.m = 4 },
+        0x47: () => { this.cbBit(0, this.reg.B); this.m = 3 },
 
+        0x48: () => { this.cbBit(1, this.reg.B); this.m = 3 },
+        0x49: () => { this.cbBit(1, this.reg.C); this.m = 3 },
+        0x4A: () => { this.cbBit(1, this.reg.D); this.m = 3 },
+        0x4B: () => { this.cbBit(1, this.reg.E); this.m = 3 },
+        0x4C: () => { this.cbBit(1, this.reg.H); this.m = 3 },
+        0x4D: () => { this.cbBit(1, this.reg.L); this.m = 3 },
+        0x4E: () => { this.cbBit(1, this.reg._HL_); this.m = 4 },
+        0x4F: () => { this.cbBit(1, this.reg.B); this.m = 3 },
+
+        0x50: () => { this.cbBit(2, this.reg.B); this.m = 3 },
+        0x51: () => { this.cbBit(2, this.reg.C); this.m = 3 },
+        0x52: () => { this.cbBit(2, this.reg.D); this.m = 3 },
+        0x53: () => { this.cbBit(2, this.reg.E); this.m = 3 },
+        0x54: () => { this.cbBit(2, this.reg.H); this.m = 3 },
+        0x55: () => { this.cbBit(2, this.reg.L); this.m = 3 },
+        0x56: () => { this.cbBit(2, this.reg._HL_); this.m = 4 },
+        0x57: () => { this.cbBit(2, this.reg.B); this.m = 3 },
+
+        0x58: () => { this.cbBit(3, this.reg.B); this.m = 3 },
+        0x59: () => { this.cbBit(3, this.reg.C); this.m = 3 },
+        0x5A: () => { this.cbBit(3, this.reg.D); this.m = 3 },
+        0x5B: () => { this.cbBit(3, this.reg.E); this.m = 3 },
+        0x5C: () => { this.cbBit(3, this.reg.H); this.m = 3 },
+        0x5D: () => { this.cbBit(3, this.reg.L); this.m = 3 },
+        0x5E: () => { this.cbBit(3, this.reg._HL_); this.m = 4 },
+        0x5F: () => { this.cbBit(3, this.reg.B); this.m = 3 },
+
+        0x60: () => { this.cbBit(4, this.reg.B); this.m = 3 },
+        0x61: () => { this.cbBit(4, this.reg.C); this.m = 3 },
+        0x62: () => { this.cbBit(4, this.reg.D); this.m = 3 },
+        0x63: () => { this.cbBit(4, this.reg.E); this.m = 3 },
+        0x64: () => { this.cbBit(4, this.reg.H); this.m = 3 },
+        0x65: () => { this.cbBit(4, this.reg.L); this.m = 3 },
+        0x66: () => { this.cbBit(4, this.reg._HL_); this.m = 4 },
+        0x67: () => { this.cbBit(4, this.reg.B); this.m = 3 },
+
+        0x68: () => { this.cbBit(5, this.reg.B); this.m = 3 },
+        0x69: () => { this.cbBit(5, this.reg.C); this.m = 3 },
+        0x6A: () => { this.cbBit(5, this.reg.D); this.m = 3 },
+        0x6B: () => { this.cbBit(5, this.reg.E); this.m = 3 },
+        0x6C: () => { this.cbBit(5, this.reg.H); this.m = 3 },
+        0x6D: () => { this.cbBit(5, this.reg.L); this.m = 3 },
+        0x6E: () => { this.cbBit(5, this.reg._HL_); this.m = 4 },
+        0x6F: () => { this.cbBit(5, this.reg.B); this.m = 3 },
+
+        0x70: () => { this.cbBit(6, this.reg.B); this.m = 3 },
+        0x71: () => { this.cbBit(6, this.reg.C); this.m = 3 },
+        0x72: () => { this.cbBit(6, this.reg.D); this.m = 3 },
+        0x73: () => { this.cbBit(6, this.reg.E); this.m = 3 },
+        0x74: () => { this.cbBit(6, this.reg.H); this.m = 3 },
+        0x75: () => { this.cbBit(6, this.reg.L); this.m = 3 },
+        0x76: () => { this.cbBit(6, this.reg._HL_); this.m = 4 },
+        0x77: () => { this.cbBit(6, this.reg.B); this.m = 3 },
+
+        0x78: () => { this.cbBit(7, this.reg.B); this.m = 3 },
+        0x79: () => { this.cbBit(7, this.reg.C); this.m = 3 },
+        0x7A: () => { this.cbBit(7, this.reg.D); this.m = 3 },
+        0x7B: () => { this.cbBit(7, this.reg.E); this.m = 3 },
+        0x7C: () => { this.cbBit(7, this.reg.H); this.m = 3 },
+        0x7D: () => { this.cbBit(7, this.reg.L); this.m = 3 },
+        0x7E: () => { this.cbBit(7, this.reg._HL_); this.m = 4 },
+        0x7F: () => { this.cbBit(7, this.reg.B); this.m = 3 },
+
+    }
 
 };
-
-function updateDebug() {
-    document.getElementById("pc").innerHTML = 'PC: 0x' + cpu.reg.PC.toString(16);
-    document.getElementById("af").innerHTML = 'AF: 0x' + cpu.reg.AF.toString(16);
-    document.getElementById("bc").innerHTML = 'BC: 0x' + cpu.reg.BC.toString(16);
-    document.getElementById("de").innerHTML = 'DE: 0x' + cpu.reg.DE.toString(16);
-    document.getElementById("hl").innerHTML = 'HL: 0x' + cpu.reg.HL.toString(16);
-    document.getElementById("sp").innerHTML = 'SP: 0x' + cpu.reg.SP.toString(16);
-};
-
 
 
 cpu = new CPU();
 
-console.log(cpu.reg)
-cpu.writeR(af, 0xFFFF);
-console.log(cpu.readR(af));
-console.log(cpu.reg);
+class PPU {
+    vram = new Uint8Array(0x2000);
+
+    write8(address, value) {
+        this.vram[address & 0x1FFF] = value & 0xFF;
+    }
+
+    read8(address) {
+        return this.vram[address & 0x1FFF];
+    }
+}
+
+ppu = new PPU();
+
+class Bus{
+    init(cpu, mmu, ppu){
+        this.cpu = cpu;
+        this.mmu = mmu;
+        this.ppu = ppu;
+    }
+
+    read8(address) {
+		switch((address & 0xF000))
+		{	
+			case 0x0000: case 0x1000: case 0x2000: case 0x3000:
+				return mmu.read8(address);
+			case 0x4000: case 0x5000: case 0x6000: case 0x7000:
+				return mmu.read8(address);
+			case 0x8000: case 0x9000:
+				return ppu.read8(address);
+			case 0xA000: case 0xB000:
+				// implement External ram
+				break;
+			case 0xC000:
+				return mmu.read8(address);
+			case 0xD000:
+				return mmu.read8(address);
+			case 0xE000:
+				// not used area
+                break;
+			case 0xF000:
+				return mmu.read8(address);
+			default: console.log("Area not implemented: " + address); break;
+		}
+		return 0;
+	};
+
+    write8(address, value) {
+		switch((address & 0xF000))
+		{	
+			case 0x0000: case 0x1000: case 0x2000: case 0x3000:
+				mmu.write8(address, value);
+			case 0x4000: case 0x5000: case 0x6000: case 0x7000:
+				mmu.write8(address, value);
+				break;
+			case 0x8000: case 0x9000:
+				ppu.write8(address, value);
+				break;
+			case 0xA000: case 0xB000:
+				// implement External ram
+				break;
+			case 0xC000:
+				mmu.write8(address, value);
+				break;
+			case 0xD000:
+				mmu.write8(address, value);
+				break;
+			case 0xE000:
+				// not used area
+			case 0xF000:
+				mmu.write8(address, value);
+				break;
+			default: console.log("Area not implemented: " + address);
+		}
+	};
+
+    next8() {
+		return this.read8(this.cpu.reg.PC++) & 0xFF;
+	}
+	
+	next16() {
+		return (this.next8() | this.next8() << 8) & 0xFFFF;
+	}
+
+}
+
+bus = new Bus();
+
+bus.init(cpu, mmu, ppu);
+cpu.init(mmu, bus);
+
+
+function updateDebug() {
+    document.getElementById("pc").innerHTML = `PC: ${cpu.reg.PC.toString(16)}`;
+    document.getElementById("af").innerHTML = 'AF: ' + cpu.reg.AF.toString(16);
+    document.getElementById("bc").innerHTML = 'BC: ' + cpu.reg.BC.toString(16);
+    document.getElementById("de").innerHTML = 'DE: ' + cpu.reg.DE.toString(16);
+    document.getElementById("hl").innerHTML = 'HL: ' + cpu.reg.HL.toString(16);
+    document.getElementById("sp").innerHTML = 'SP: ' + cpu.reg.SP.toString(16);
+
+    document.getElementById("zero").checked = (cpu.reg.f & 0x80) === 0x80;
+    document.getElementById("negative").checked = (cpu.reg.f & 0x40) === 0x40;
+    document.getElementById("halfcarry").checked = (cpu.reg.f & 0x20) === 0x20;
+    document.getElementById("carry").checked = (cpu.reg.f & 0x10) === 0x10;
+};
 
 function tick() {
     cpu.tick();
     updateDebug();
+}
+
+function run(){
+    while()
 }

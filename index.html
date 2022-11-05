@@ -9,20 +9,32 @@
 </head>
 
 <body>
-    <div class="registers" id="registers">
-        <p id="af">AF: </p>
-        <p id="bc">BC: </p>
-        <p id="de">DE: </p>
-        <p id="hl">HL: </p>
-        <p id="pc">PC: </p>
-        <p id="sp">SP: </p>
-    </div>
-
-    <div class="reg" id="reg">
-        
-    </div>
-
-    <button type="button" id="run" onclick="tick()">Run</button>
+    <section class="screen">
+        <canvas id="renderer"></canvas>
+    </section>
+    <section class="debug">
+        <div class="registers-flags">
+            <div class="registers" id="registers">
+                <p id="af">AF: 0000</p><p id="bc">BC: 0000</p>
+                <p id="de">DE: 0000</p><p id="hl">HL: 0000</p>
+                <p id="pc">PC: 0000</p><p id="sp">SP: 0000</p>
+            </div>
+            <div class="flags" id="flags">
+                <p>Z</p><label><input type="checkbox" id="zero"></label>
+                <p>N</p><label><input type="checkbox" id="negative"></label>
+                <p>H</p><label><input type="checkbox" id="halfcarry"></label>
+                <p>C</p><label><input type="checkbox" id="carry"></label>
+            </div>
+        </div>
+        <div class = buttons>
+            <button type="button" id="run" onclick="tick()">Step</button>
+            <button type="button" >Step over</button>
+            <button type="button" >Reset</button>
+            <button type="button" >Pause</button>
+            <button type="button" >Stop</button>
+            <button type="button" >Run</button>
+        </div>
+    </section>
 
     <script src="script.js"></script>
 </body>
