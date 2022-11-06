@@ -9,33 +9,44 @@
 </head>
 
 <body>
-    <section class="screen">
-        <canvas id="renderer"></canvas>
-    </section>
-    <section class="debug">
-        <div class="registers-flags">
-            <div class="registers" id="registers">
-                <p id="af">AF: 0000</p><p id="bc">BC: 0000</p>
-                <p id="de">DE: 0000</p><p id="hl">HL: 0000</p>
-                <p id="pc">PC: 0000</p><p id="sp">SP: 0000</p>
-            </div>
-            <div class="flags" id="flags">
-                <p>Z</p><label><input type="checkbox" id="zero"></label>
-                <p>N</p><label><input type="checkbox" id="negative"></label>
-                <p>H</p><label><input type="checkbox" id="halfcarry"></label>
-                <p>C</p><label><input type="checkbox" id="carry"></label>
-            </div>
-        </div>
-        <div class = buttons>
-            <button type="button" onclick="tick()">Step</button>
-            <button type="button" >Step over</button>
-            <button type="button" >Reset</button>
-            <button type="button" >Pause</button>
-            <button type="button" >Stop</button>
-            <button type="button" onclick="run()">Run</button>
-        </div>
-    </section>
-
+    <main class="emulator">
+        <section class="screen">
+            <canvas id="renderer"></canvas>
+        </section>
+        <section class="emulator-helpers">
+            <section class="debug">
+                <div class="registers-flags">
+                    <div class="registers" id="registers">
+                        <p id="af">AF: 0000</p>
+                        <p id="bc">BC: 0000</p>
+                        <p id="de">DE: 0000</p>
+                        <p id="hl">HL: 0000</p>
+                        <p id="pc">PC: 0000</p>
+                        <p id="sp">SP: 0000</p>
+                    </div>
+                    <div class="flags" id="flags">
+                        <label>Z<input type="checkbox" id="zero"></label>
+                        <label>N<input type="checkbox" id="negative"></label>
+                        <label>H<input type="checkbox" id="halfcarry"></label>
+                        <label>C<input type="checkbox" id="carry"></label>
+                    </div>
+                </div>
+                <div class=buttons>
+                    <button type="button" onclick="tick()">Step</button>
+                    <button type="button">Step over</button>
+                    <button type="button">Reset</button>
+                    <button type="button">Pause</button>
+                    <button type="button">Stop</button>
+                    <button type="button" onclick="run()">Run</button>
+                </div>
+            </section>
+            <section class="helper">
+                <p>Lorem ipsum dolor, sit amet consectetur adipisicing elit. Eaque temporibus impedit aliquid quod
+                    consequuntur quae, nostrum officia reiciendis sed laudantium delectus velit, aperiam tempora iure ab
+                    in obcaecati ullam ad.</p>
+            </section>
+        </section>
+    </main>
     <script src="script.js"></script>
 </body>
 
