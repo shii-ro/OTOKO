@@ -10,7 +10,7 @@ class IO{
 
 	write8(address, value) {
 		switch (address & 0xFF) {
-		case 0x47: this.ppu.updatePalette(value & 0xFF); break;
+		// case 0x47: this.ppu.updatePalette(value & 0xFF); break;
 		case 0x50: this.mmu.loadRom(mmu.romPath); break;
 		default:
 			this.register[address & 0x7F] = (value & 0xFF);
@@ -47,6 +47,7 @@ class MMU {
         this.hram = new Uint8Array(0x80);
 
         this.romBank0 = [...this.bios];
+        this.romBankN = [...this.bios];
     };
 
     init(io){
@@ -163,14 +164,14 @@ class CPU {
         get HL() { return this.H << 8 | this.L },
         set HL(u16) { [this.L, this.H] = [(u16 & 0xFF), (u16 >> 8)] },
 
-        get _AF_() { return this.A << 8 | this.F },
-        set _AF_(u16) { [this.F, this.A] = [(u16 & 0xFF), (u16 >> 8)] },
-        get _BC_() { return this.B << 8 | this.C },
-        set _BC_(u16) { [this.C, this.B] = [(u16 & 0xFF), (u16 >> 8)] },
-        get _DE_() { return this.D << 8 | this.E },
-        set _DE_(u16) { [this.E, this.D] = [(u16 & 0xFF), (u16 >> 8)] },
-        get _HL_() { return bus.read8(this.HL)},
-        set _HL_(u8) { bus.write8(this.HL, u8)},
+        get _AF_() { return this.bus.read8(this.AF) },
+        set _AF_(u16) { bus.write8(this.AF, u8) },
+        get _BC_() { return bus.read8(this.HL) },
+        set _BC_(u16) { bus.write8(this.BC, u8) },
+        get _DE_() { return bus.read8(this.DE) },
+        set _DE_(u8) { bus.write8(this.DE, u8) },
+        get _HL_() { return bus.read8(this.HL) },
+        set _HL_(u8) { bus.write8(this.HL, u8) },
     };
 
     // writeR = (register, value) => this.reg[register] = value;
@@ -194,8 +195,23 @@ class CPU {
     setFlag(bit, condition) {
 		this.reg.F = (this.reg.F & ~(1 << bit)) | (condition << bit);
 	};
-    setFlags(z, n, h, c){
-    }
+
+    push8(value) {
+		bus.write8(--this.SP, value & 0xFF);
+	}
+	
+    push16(value) {
+		this.push8((value >> 8) & 0xFF);
+		this.push8(value & 0xFF);
+	}
+
+    pop8() {
+		return this.bus.read8(this.reg.SP++);
+	}
+	
+	pop16() {
+		return this.pop8() | this.pop8() << 8;
+	}
 
     jmpCond(condition){
         let offset = bus.next8();
@@ -205,6 +221,13 @@ class CPU {
 		}
 		this.m = 2;
     }
+
+    call(){
+        this.push16(this.reg.PC + 2);
+		this.reg.PC = this.bus.next16();
+		this.m = 6;
+    }
+
     xor = (u8) => {
         this.reg.A ^= u8 & 0xFF;
         this.reg.F = (this.reg.A === 0) ? 0x80 : 0x00
@@ -225,6 +248,8 @@ class CPU {
         0x00: () => this.m = 1,
 
         0x20: () => {this.jmpCond((this.reg.F & 0x80) === 0x00)},
+
+        0xCD: () => { this.call()},
 
         0x04: () => {this.incR(B); this.m = 1},
         0x0C: () => {this.incR(C); this.m = 1},
@@ -254,6 +279,11 @@ class CPU {
         0x22: () => { this.reg._HL_ = this.reg.A; this.reg.HL++; this.m = 2 },
         0x32: () => { this.reg._HL_ = this.reg.A; this.reg.HL--; this.m = 2 },
 
+        0x0A: () => { this.reg.A = this.reg._BC_; this.m = 2},
+        0x1A: () => { this.reg.A = this.reg._DE_; this.m = 2},
+        0x2A: () => { this.reg.A = this.reg._HL_; this.reg.HL++; this.m = 2},
+        0x3A: () => { this.reg.A = this.reg._HL_; this.reg.HL--; this.m = 2},
+
         0x06: () => {this.reg.B = bus.next8(); this.m = 2},
         0x0E: () => {this.reg.C = bus.next8(); this.m = 2},
         0x16: () => {this.reg.D = bus.next8(); this.m = 2},
@@ -262,6 +292,7 @@ class CPU {
         0x2E: () => {this.reg.L = bus.next8(); this.m = 2},
         0x36: () => {this.reg._HL_ = bus.next8(); this.m = 3},
         0x3E: () => {this.reg.A = bus.next8(); this.m = 2},
+
 
         0x40: () => { this.reg.B = this.reg.B; this.m = 1 },
         0x41: () => { this.reg.B = this.reg.C; this.m = 1 },
@@ -335,6 +366,7 @@ class CPU {
         0x7E: () => { this.reg.A = this.reg._HL_; this.m = 2 },
         0x7F: () => { this.reg.A = this.reg.A; this.m = 1 },
 
+        0xE0: () => { this.bus.write8(0xFF00 + this.bus.next8()), this.reg.A; this.m = 3},
         0xE2: () => { this.bus.write8(0xFF00 + this.reg.C, this.reg.A); this.m = 2},
 
         0xA8: () => { this.xor(this.reg.B); this.m = 1 },
@@ -546,8 +578,8 @@ running = true;
 
 function run(){
     while(running){
+        console.log(`PC: ${cpu.reg.PC.toString(16)} OC: ${cpu.OC.toString(16)} AF: ${cpu.reg.AF.toString(16)} BC: ${cpu.reg.BC.toString(16)} DE: ${cpu.reg.DE.toString(16)} HL: ${cpu.reg.HL.toString(16)}`);
         cpu.tick();
-        console.log(`PC: ${cpu.reg.PC.toString(16)} OC: ${cpu.OC.toString(16)} HL: ${cpu.reg.HL.toString(16)}`);
     }
     // updateDebug();
 }
