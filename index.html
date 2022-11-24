@@ -11,7 +11,7 @@
 <body>
     <main class="emulator">
         <section class="screen">
-            <canvas id="renderer"></canvas>
+            <canvas id="renderer" width="160" height="144"></canvas>
         </section>
         <section class="emulator-helpers">
             <section class="debug">
@@ -32,22 +32,48 @@
                     </div>
                 </div>
                 <div class=buttons>
-                    <button type="button" onclick="tick()">Step</button>
+                    <button type="button" id="step">Step</button>
                     <button type="button">Step over</button>
                     <button type="button">Reset</button>
                     <button type="button">Pause</button>
                     <button type="button">Stop</button>
-                    <button type="button" onclick="run()">Run</button>
+                    <button type="button" id="run">Run</button>
                 </div>
             </section>
             <section class="helper">
+                <button type="button" class="btn" id="loadRom">Load Rom...</button>
+                <input type="file" id="rom" name="file">
                 <p>Lorem ipsum dolor, sit amet consectetur adipisicing elit. Eaque temporibus impedit aliquid quod
                     consequuntur quae, nostrum officia reiciendis sed laudantium delectus velit, aperiam tempora iure ab
                     in obcaecati ullam ad.</p>
             </section>
         </section>
     </main>
-    <script src="script.js"></script>
+    <script type="module" src="script.js"></script>
+    <script type="module">
+        import { tick, run, loadRom } from "./script.js";
+        document.getElementById("step").addEventListener("click", () => tick());
+        document.getElementById("run").addEventListener("click", () => run());
+        document.getElementById("loadRom").addEventListener('click', () => {
+            document.getElementById('rom').click()
+        });
+
+        let romLoader = document.getElementById('rom');
+
+        romLoader.onchange = function () {
+            let file = this.files[0];
+            let reader = new FileReader(); // no arguments
+            let view = null;
+            reader.readAsArrayBuffer(file);
+
+            console.log("file loaded");
+            reader.onloadend = () => {
+                view = new Uint8Array(reader.result);
+                loadRom(view);
+            }
+        }
+
+    </script>
 </body>
 
 </html>
