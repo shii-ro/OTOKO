@@ -23,6 +23,7 @@ class PPU {
         this.screen = document.getElementById('renderer');
         this.ctx = this.screen.getContext('2d');
         this.imageData = this.ctx.createImageData(160, 144);
+        this.framebuffer = new Uint32Array(this.imageData.buffer);
     }
 
     LCDC = {
@@ -31,7 +32,7 @@ class PPU {
         windowTileMapArea: () => (this.io.read8(regLCDC) & 0x40) === 0x40 ? 0x1C00 : 0x1800,
         windowEnabled: () => (this.io.read8(regLCDC) & 0x20) === 0x20,
         BGWindowTileDataArea: () => (this.io.read8(regLCDC) & 0x10) === 0x10 ? 0x0000 : 0x0000,
-        BGTileMapArea: () => (this.io.read8(regLCDC) & 0x8) === 0x8 ? 0x1800 : 0x1800,
+        BGTileMapArea: () => (this.io.read8(regLCDC) & 0x8) === 0x8 ? 0x1C00 : 0x1800,
         OBJSize: () => (this.io.read8(regLCDC) & 0x4) === 0x4,
         OBJEnable: () => (this.io.read8(regLCDC) & 0x2) === 0x2,
         BGWindowEnable: () => (this.io.read8(regLCDC) & 0x1) === 0x1
@@ -44,9 +45,8 @@ class PPU {
         return this.io.read8(regLY) & 0xFF;
     }
 
-    get SCY() { return this.io.read8(regSCY); }
-
-    set SCY(u8) { this.io.write8(regSCY, u8); }
+    get SCY() { return this.io.read8(regSCY); } set SCY(u8) { this.io.write8(regSCY, u8); }
+    get SCX() { return this.io.read8(regSCX); } set SCX(u8) { this.io.write8(regSCX, u8); }
 
     write8(address, value) {
         this.vram[address & 0x1FFF] = value & 0xFF;
@@ -57,7 +57,7 @@ class PPU {
     }
 
     tick(mCycles) {
-        if (this.LCDC.LCDEnabled) {
+        if (this.LCDC.LCDEnabled()) {
             this.scanlineCounter += mCycles;
 
             if (this.scanlineCounter >= 114) {
@@ -72,7 +72,6 @@ class PPU {
                 }
                 else if (this.LY > 153) {
                     this.LY = 0x00;   
-                    
                     this.ctx.putImageData(this.imageData, 0, 0);
                 }
             }
@@ -82,7 +81,7 @@ class PPU {
     getTileRow2BPP(rowH, rowL) {
         let tiledata = 0;
 
-        tiledata = rowH | (rowL << 8);
+        tiledata = rowL | (rowH << 8);
 
         tiledata = (tiledata & 0xF00F) | ((tiledata & 0x0F00) >> 4) | ((tiledata & 0x00F0) << 4);
         tiledata = (tiledata & 0xC3C3) | ((tiledata & 0x3030) >> 2) | ((tiledata & 0x0C0C) << 2);
@@ -110,7 +109,7 @@ class PPU {
         let tiledata_l = 0;
         let tiledata_h = 0;
         let tiledata = 0;
-        let tile_y = Math.floor((scanline + this.io.read8(regSCY))/ 8) * 32; // i lost so much time debugging...
+        let tile_y = Math.floor(((scanline + this.io.read8(regSCY)) & 0xFF) / 8) * 32; // i lost so much time debugging...
         let y_pos = 2 * ((scanline + this.io.read8(regSCY)) % 8);
         let pixel = 0;
 
@@ -128,10 +127,11 @@ class PPU {
                 let point = (((square * 8) + x) + (scanline * 160)) * 4;
                 let color = COLORS[this.palette[pixel]];
 
+
                 this.imageData.data[point + 0] = color[0];        // R value
                 this.imageData.data[point + 1] = color[1];       // G value
-                this.imageData.data[point + 2] = color[2]; // B value
-                this.imageData.data[point + 3] = 0xFF; // A value
+                this.imageData.data[point + 2] = color[2];      // B value
+                this.imageData.data[point + 3] = 0xFF;          // A value
             }
         }
     }

@@ -53,17 +53,22 @@ let debug = false;
 // }
 
 function runFrame() {
-    const MAX_CYCLES = 4194304 / 60;
+    const MAX_CYCLES = 69905;
     let cyclesThisTick = 0;
 
     while (cyclesThisTick < MAX_CYCLES) {
+        if (debug) {
+            console.log(`PC: ${cpu.reg.PC.toString(16)} OC: ${cpu.OC.toString(16)} AF: ${cpu.reg.AF.toString(16)} BC: ${cpu.reg.BC.toString(16)} DE: ${cpu.reg.DE.toString(16)} HL: ${cpu.reg.HL.toString(16)} SP:  ${cpu.reg.SP.toString(16)}`);
+        }
         cpu.tick();
         ppu.tick(cpu.m);
         cyclesThisTick += cpu.m;
-        // if (cpu.reg.PC === 0xC000) {
+        // if (cpu.reg.PC === 0xCC52) {
+        //     // 0xC6B8
+        //     // CC52
         //     console.log(`PC: ${cpu.reg.PC.toString(16)} OC: ${cpu.OC.toString(16)} AF: ${cpu.reg.AF.toString(16)} BC: ${cpu.reg.BC.toString(16)} DE: ${cpu.reg.DE.toString(16)} HL: ${cpu.reg.HL.toString(16)} SP:  ${cpu.reg.SP.toString(16)}`);
 
-        //     return;
+        //     // debug = true;
         // }
     }
     window.requestAnimationFrame(runFrame);
@@ -75,5 +80,6 @@ function run() {
 
 function loadRom(rom) {
     mmu.rom = new Uint8Array(rom);
+    mmu.loadRom();
 }
 export { tick, run, loadRom };

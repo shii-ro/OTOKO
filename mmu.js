@@ -10,6 +10,7 @@ class MMU {
             0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC, 0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E, 0x3C, 0x42, 0xB9, 0xA5, 0xB9, 0xA5, 0x42, 0x3C, 0x21, 0x04, 0x01, 0x11, 0xA8, 0x00, 0x1A, 0x13, 0xBE, 0x20, 0xFE, 0x23, 0x7D, 0xFE, 0x34, 0x20,
             0xF5, 0x06, 0x19, 0x78, 0x86, 0x23, 0x05, 0x20, 0xFB, 0x86, 0x20, 0xFE, 0x3E, 0x01, 0xE0, 0x50, 0x00
         ];
+        this.biosOff = false;
 
         this.romBank0 = new Uint8Array(0x4000);
         this.romBankN = new Uint8Array(0x4000);
@@ -22,6 +23,7 @@ class MMU {
         for (let i = 0; i < 60; i++) {
             this.romBank0[0x104 + i] = this.bios[0xA8 + i];
         }
+
         this.romBankN = [...this.bios];
     };
 
@@ -33,7 +35,11 @@ class MMU {
         // implement a mapper class later
         console.log(this.rom);
         this.romBank0 = [...this.rom];
-        // this.romBank0 = [...this.bios];
+        if (this.biosOff === false) {
+            for (let i = 0; i < this.bios.length; i++) {
+                this.romBank0[i] = this.bios[i];
+            }
+        }
     }
 
     read8(address) {
@@ -60,6 +66,9 @@ class MMU {
     }
 
     write8(address, value) {
+        if (address == 0xFF02 && value == 0x81) {
+            console.log(String.fromCharCode(this.read8(0xFF01)));
+        }
         switch ((address & 0xFFFF) >> 12) {
             case 0: case 1: case 2: case 3:
                 //romBank0[address & 0x3FFF] = (byte) (value & 0xFF);
