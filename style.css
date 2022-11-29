@@ -8,7 +8,7 @@ body {
 .emulator {
     display: flex;
     flex-direction: row;
-    justify-content: space-between;
+    /* justify-content: space-between; */
 }
 
 .screen {
@@ -27,33 +27,41 @@ body {
     display: flex;
     flex-direction: column;
     height: 100%;
-    min-width: 180px;
-    max-width: 180px;
 }
 
 .debug {
+    margin: 5px;
     padding: 3px;
     border: 1px solid black;
+    border-radius: 5px;
     display: flex;
     flex-direction: column;
     justify-content: center;
+    max-width: 15vw;
+    align-self: flex-end;
 }
 
 .registers-flags {
-    padding: 0;
-    margin: 0;
+    /* align-self: center; */
+    font-size: small;
+    max-width: 12vw;
+    /* padding: 0;
+    margin: 0; */
     display: flex;
 }
-
 .registers {
-    display: grid;
-    grid-template-columns: 40% 40%;
-    font-size: 12px;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 10px;
+    align-items: flex-start;
+    text-align: left;
+    /* text-align: justify; */
+    flex-wrap: wrap;
     border: 1px solid black;
-    justify-content: center;
-    grid-auto-rows: 17px;
-    height: 80%;
-    flex-grow: 3;
+}
+.registers>p {
+    width: 50%;
 }
 
 .flags {
@@ -107,4 +115,26 @@ input[type=checkbox] {
 
 input[type="file"] {
     display: none;
+}
+
+.helper {
+    display: flex;
+}
+
+.next-instructions {
+    margin-top: 2rem;
+    display: flex;
+    flex-direction: column;
+    align-self: flex-end;
+
+}
+
+.instructions {
+    font-size: 12px;
+    min-width: 30vw;
+    width: auto;
+    border: 1px solid black;
+    height: 20rem;
+    overflow-y: scroll;
+    padding: 10px;
 }

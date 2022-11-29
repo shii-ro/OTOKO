@@ -17,12 +17,13 @@
             <section class="debug">
                 <div class="registers-flags">
                     <div class="registers" id="registers">
-                        <p id="af">AF: 0000</p>
-                        <p id="bc">BC: 0000</p>
-                        <p id="de">DE: 0000</p>
-                        <p id="hl">HL: 0000</p>
-                        <p id="pc">PC: 0000</p>
-                        <p id="sp">SP: 0000</p>
+                        <p id="AF">AF: 0000</p>
+                        <p id="BC">BC: 0000</p>
+                        <p id="DE">DE: 0000</p>
+                        <p id="HL">HL: 0000</p>
+                        <p id="PC">PC: 0000</p>
+                        <p id="SP">SP: 0000</p>
+                        <p id="OC">OC: 00</p>
                     </div>
                     <div class="flags" id="flags">
                         <label>Z<input type="checkbox" id="zero"></label>
@@ -38,14 +39,13 @@
                     <button type="button">Pause</button>
                     <button type="button">Stop</button>
                     <button type="button" id="run">Run</button>
+                    <button type="button" class="btn" id="loadRom">Load Rom...</button>
+                    <input type="file" id="rom" name="file">
                 </div>
             </section>
-            <section class="helper">
-                <button type="button" class="btn" id="loadRom">Load Rom...</button>
-                <input type="file" id="rom" name="file">
-                <p>Lorem ipsum dolor, sit amet consectetur adipisicing elit. Eaque temporibus impedit aliquid quod
-                    consequuntur quae, nostrum officia reiciendis sed laudantium delectus velit, aperiam tempora iure ab
-                    in obcaecati ullam ad.</p>
+            <section class="next-instructions">
+                <div class="instructions" id="instructions">
+                </div>
             </section>
         </section>
     </main>

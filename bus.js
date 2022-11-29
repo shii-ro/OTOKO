@@ -58,9 +58,11 @@ class Bus {
         }
     };
 
+    // debugging puporse only
     read16() {
-        return this.read8(this.cpu.reg.PC + 1) | this.read8(this.cpu.reg.PC + 2) << 8;
+        return this.read8(this.cpu.reg.PC - 2 ) | this.read8(this.cpu.reg.PC - 1) << 8;
     }
+
     next8() {
         let u8 = this.read8(this.cpu.reg.PC++) & 0xFF;
         return u8;

@@ -4,6 +4,7 @@ import { IO } from "./io.js";
 import { MMU } from "./mmu.js";
 import { PPU } from "./ppu.js";
 import { Bus } from "./bus.js";
+import instr_data from "./instruction_data.js";
 
 const cpu = new CPU();
 const io = new IO();
@@ -17,28 +18,50 @@ io.init(mmu, cpu, ppu);
 mmu.init(io);
 ppu.init(io);
 
-function updateDebug() {
-    document.getElementById("pc").innerHTML = `PC: ${cpu.reg.PC.toString(16)}`;
-    document.getElementById("af").innerHTML = 'AF: ' + cpu.reg.AF.toString(16);
-    document.getElementById("bc").innerHTML = 'BC: ' + cpu.reg.BC.toString(16);
-    document.getElementById("de").innerHTML = 'DE: ' + cpu.reg.DE.toString(16);
-    document.getElementById("hl").innerHTML = 'HL: ' + cpu.reg.HL.toString(16);
-    document.getElementById("sp").innerHTML = 'SP: ' + cpu.reg.SP.toString(16);
+function updateDebug(debug) {
+    for(const prop in debug){
+        document.getElementById(prop).innerHTML = `${prop}: ${debug[prop]}`;
+    }
 
     document.getElementById("zero").checked = (cpu.reg.F & 0x80) === 0x80;
     document.getElementById("negative").checked = (cpu.reg.F & 0x40) === 0x40;
     document.getElementById("halfcarry").checked = (cpu.reg.F & 0x20) === 0x20;
     document.getElementById("carry").checked = (cpu.reg.F & 0x10) === 0x10;
+
+    console.log(debug.OC)
+
+    const newLine = `
+                     PC: ${debug.PC}&emsp;
+                     OC: ${debug.OC}&emsp;
+                     ${instr_data[cpu.OC](cpu, debug)}
+                     &ensp;AF: ${debug.AF}\t
+                     BC: ${debug.BC}\t
+                     DE: ${debug.DE}\t
+                     HL: ${debug.HL}\t
+                     SP: ${debug.SP}
+                     `;
+
+    document.getElementById("instructions").innerHTML += (newLine + '<br>');
 };
 
 function tick() {
+    const instr_debug = {
+        'PC': cpu.reg.PC.toString(16).toUpperCase(),
+        'AF': cpu.reg.AF.toString(16).toUpperCase(),
+        'BC': cpu.reg.BC.toString(16).toUpperCase(),
+        'DE': cpu.reg.DE.toString(16).toUpperCase(),
+        'HL': cpu.reg.HL.toString(16).toUpperCase(),
+        'SP': cpu.reg.SP.toString(16).toUpperCase(),
+    }
     cpu.tick();
+    instr_debug['OC'] += (cpu.OC === 0xCB) ? ' ' + cpu.bus.read8(cpu.reg.PC - 1).toString(16).toUpperCase() : '';
+    updateDebug(instr_debug);
     console.log(`PC: ${cpu.reg.PC.toString(16)} OC: ${cpu.OC.toString(16)} AF: ${cpu.reg.AF.toString(16)} BC: ${cpu.reg.BC.toString(16)} DE: ${cpu.reg.DE.toString(16)} HL: ${cpu.reg.HL.toString(16)} SP:  ${cpu.reg.SP.toString(16)}`);
-    updateDebug();
+
 }
 
 let running = true;
-let debug = false;
+let debug = false; 
 
 // function run() {
 //     // while (true) {
@@ -57,19 +80,21 @@ function runFrame() {
     let cyclesThisTick = 0;
 
     while (cyclesThisTick < MAX_CYCLES) {
-        if (debug) {
-            console.log(`PC: ${cpu.reg.PC.toString(16)} OC: ${cpu.OC.toString(16)} AF: ${cpu.reg.AF.toString(16)} BC: ${cpu.reg.BC.toString(16)} DE: ${cpu.reg.DE.toString(16)} HL: ${cpu.reg.HL.toString(16)} SP:  ${cpu.reg.SP.toString(16)}`);
-        }
+
+        // if (debug) {
+        //     console.log(`PC: ${cpu.reg.PC.toString(16)} OC: ${cpu.OC.toString(16)} AF: ${cpu.reg.AF.toString(16)} BC: ${cpu.reg.BC.toString(16)} DE: ${cpu.reg.DE.toString(16)} HL: ${cpu.reg.HL.toString(16)} SP:  ${cpu.reg.SP.toString(16)}`);
+        // }
         cpu.tick();
         ppu.tick(cpu.m);
-        cyclesThisTick += cpu.m;
-        // if (cpu.reg.PC === 0xCC52) {
-        //     // 0xC6B8
-        //     // CC52
-        //     console.log(`PC: ${cpu.reg.PC.toString(16)} OC: ${cpu.OC.toString(16)} AF: ${cpu.reg.AF.toString(16)} BC: ${cpu.reg.BC.toString(16)} DE: ${cpu.reg.DE.toString(16)} HL: ${cpu.reg.HL.toString(16)} SP:  ${cpu.reg.SP.toString(16)}`);
+        if (cpu.reg.PC === 0xDEf9 && cpu.OC === 0x2F) {
+            // 0xC6B8
+            // CC52
+            // console.log(`PC: ${cpu.reg.PC.toString(16)} OC: ${cpu.OC.toString(16)} AF: ${cpu.reg.AF.toString(16)} BC: ${cpu.reg.BC.toString(16)} DE: ${cpu.reg.DE.toString(16)} HL: ${cpu.reg.HL.toString(16)} SP:  ${cpu.reg.SP.toString(16)}`);
 
-        //     // debug = true;
-        // }
+            // debug = true;
+        }
+        cyclesThisTick += cpu.m;
+
     }
     window.requestAnimationFrame(runFrame);
 }

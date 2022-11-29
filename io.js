@@ -9,6 +9,7 @@ class IO {
     }
 
     write8(address, value) {
+        this.register[address & 0x7F] = (value & 0xFF);
         switch (address & 0xFF) {
             case 0x47: this.ppu.updatePalette(0xFC & 0xFF); break;
             case 0x42: this.register[0x42] = value; break;

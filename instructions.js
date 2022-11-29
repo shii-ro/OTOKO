@@ -1,3 +1,4 @@
+import { CPU } from "./cpu.js";
 import cbInstructions from "./instructionsCB.js";
 
 const A = 'A';
@@ -27,15 +28,15 @@ const instructions = {
     0x04: (cpu) => { cpu.incR(B); cpu.m = 1 }, // INC B
     0x05: (cpu) => { cpu.decR(B); cpu.m = 1 }, // DEC B
     0x06: (cpu) => { cpu.reg.B = cpu.bus.next8(); cpu.m = 2 }, // LD B, u8
-    // 0x07: //RLCA
-    // 0x08:
+    0x07: (cpu) => { cpu.rlca(); cpu.m = 1; }, //RLCA
+    0x08: (cpu) => { cpu.bus.write8(cpu.bus.next16(), cpu.reg.SP); cpu.m = 5 },
     0x09: (cpu) => { cpu.add16(cpu.reg.BC); cpu.m = 2 }, // ADD HL, BC
     0x0A: (cpu) => { cpu.reg.A = cpu.reg._BC_; cpu.m = 2 }, // LD A, (BC)
     0x0B: (cpu) => { cpu.reg.BC--; cpu.m = 2 }, // DEC BC
     0x0C: (cpu) => { cpu.incR(C); cpu.m = 1 }, // INC C
     0x0D: (cpu) => { cpu.decR(C); cpu.m = 1 }, // DEC C
     0x0E: (cpu) => { cpu.reg.C = cpu.bus.next8(); cpu.m = 2 }, // LD C, u8
-    // 0x0F: // RRCA
+    0x0F: (cpu) => { cpu.rrca(); cpu.m = 1; },// RRCA
     // 0x10: // STOP
     0x11: (cpu) => { cpu.reg.DE = cpu.bus.next16(); cpu.m = 3 }, // LD DE, u16
     0x12: (cpu) => { cpu.reg._DE_ = cpu.reg.A; cpu.m = 2 }, // LD (DE), A
@@ -67,7 +68,7 @@ const instructions = {
     0x2C: (cpu) => { cpu.incR(L); cpu.m = 1 }, // INC L
     0x2D: (cpu) => { cpu.decR(L); cpu.m = 1 }, // DEC L
     0x2E: (cpu) => { cpu.reg.L = cpu.bus.next8(); cpu.m = 2 }, // LD L, u8
-    0x2F: (cpu) => { cpu.reg.A ^= 0xFF; cpu.setFlag(NEGATIVE, true); cpu.setFlag(HALF_CARRY, true); cpu.m = 1 },// CPL
+    0x2F: (cpu) => { cpu.reg.A = cpu.reg.A ^ 0xFF; cpu.setFlag(NEGATIVE, true); cpu.setFlag(HALF_CARRY, true); cpu.m = 1; },// CPL
     0x30: (cpu) => { cpu.jr((cpu.reg.F & CARRY) !== CARRY) }, // JR NC, i8
     0x31: (cpu) => { cpu.reg.SP = cpu.bus.next16(); cpu.m = 3 }, // LD SP, u16
     0x32: (cpu) => { cpu.reg._HL_ = cpu.reg.A; cpu.reg.HL--; cpu.m = 2 }, // LD (HL-),  A
@@ -75,15 +76,15 @@ const instructions = {
     0x34: (cpu) => { cpu.incR(_HL_); cpu.m = 3 }, // INC (HL)
     0x35: (cpu) => { cpu.decR(_HL_); cpu.m = 3 }, // DEC (HL)
     0x36: (cpu) => { cpu.reg._HL_ = cpu.bus.next8(); cpu.m = 3 },
-    0x37: (cpu) => { cpu.setFlag(CARRY, true); cpu.setFlag(NEGATIVE, false); cpu.setFlag(HALF_CARRY, false) },
+    0x37: (cpu) => { cpu.setFlag(CARRY, true); cpu.setFlag(NEGATIVE, false); cpu.setFlag(HALF_CARRY, false); },
     0x38: (cpu) => { cpu.jr((cpu.reg.F & CARRY) === CARRY) }, // ADD 
     0x39: (cpu) => { cpu.add16(cpu.reg.SP); cpu.m = 2 }, // ADD HL, SP
     0x3A: (cpu) => { cpu.reg.A = cpu.reg._HL_; cpu.reg.HL--; cpu.m = 2 }, // LD A, (HL-)
     0x3B: (cpu) => { cpu.reg.SP--; cpu.m = 2 }, // DEC SP
     0x3C: (cpu) => { cpu.incR(A); cpu.m = 1 }, // INC A
     0x3D: (cpu) => { cpu.decR(A); cpu.m = 1 }, // DEC A
-    0x3E: (cpu) => { cpu.reg.A = cpu.bus.next8(); cpu.m = 2 }, 
-    0x3F: (cpu) => { cpu.setFlag(CARRY), !cpu.getFlag(CARRY); cpu.setFlag(NEGATIVE, false); cpu.setFlag(HALF_CARRY, false); cpu.m = 1 }, // SCF
+    0x3E: (cpu) => { cpu.reg.A = cpu.bus.next8(); cpu.m = 2 },
+    0x3F: (cpu) => { cpu.setFlag(CARRY, cpu.getFlag(CARRY) ^ 1); cpu.setFlag(NEGATIVE, false); cpu.setFlag(HALF_CARRY, false); cpu.m = 1 }, // SCF
     0x40: (cpu) => { cpu.reg.B = cpu.reg.B; cpu.m = 1 },
     0x41: (cpu) => { cpu.reg.B = cpu.reg.C; cpu.m = 1 },
     0x42: (cpu) => { cpu.reg.B = cpu.reg.D; cpu.m = 1 },
@@ -247,12 +248,13 @@ const instructions = {
     0xF1: (cpu) => { cpu.reg.AF = cpu.pop16(); cpu.m = 3 }, // POP AF
     0xF3: (cpu) => { cpu.m = 1 }, // DI
     0xF5: (cpu) => { cpu.push16(cpu.reg.AF); cpu.m = 4 }, // PUSH AF
+    0xF9: (cpu) => { cpu.reg.SP = cpu.reg.HL; cpu.m = 2}, // LD SP, HL
     0xFA: (cpu) => { cpu.reg.A = cpu.bus.read8(cpu.bus.next16()); cpu.m = 4 },
     0xFB: (cpu) => { cpu.m = 1 }, // EI
     0xFE: (cpu) => { cpu.cp(cpu.bus.next8()); cpu.m = 2 }, // CP A, u8
-
     0xCB: (cpu) => {
-        let cbInst = cbInstructions[cpu.OC = cpu.bus.next8()];
+        cpu.OC = cpu.bus.next8();
+        let cbInst = cbInstructions[cpu.OC];
         if (cbInst === undefined)
             console.log("CB Instruction not implemented: " + cpu.OC.toString(16))
         cbInst(cpu);
