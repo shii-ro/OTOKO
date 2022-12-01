@@ -49,9 +49,11 @@
             </section>
         </section>
     </main>
-    <script type="module" src="script.js"></script>
+    <script src="src/constants.js"></script>
+    <script type="module" src="src/script.js"></script>
     <script type="module">
-        import { tick, run, loadRom } from "./script.js";
+        import { tick, run, loadRom } from "./src/script.js";
+        
         document.getElementById("step").addEventListener("click", () => tick());
         document.getElementById("run").addEventListener("click", () => run());
         document.getElementById("loadRom").addEventListener('click', () => {
@@ -60,6 +62,7 @@
 
         let romLoader = document.getElementById('rom');
 
+    
         romLoader.onchange = function () {
             let file = this.files[0];
             let reader = new FileReader(); // no arguments
