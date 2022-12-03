@@ -29,7 +29,7 @@ class MMU {
         let cartType = this.rom[0x147];
         let romSize = this.rom[0x148];
 
-        // console.log(cartType, romSize);
+        console.log(cartType, romSize);
 
         switch (cartType) {
             case 0x00: this.cart = this.cartType_NONE; break;
@@ -40,11 +40,11 @@ class MMU {
 
         // dont judge me
         if (this.biosOff === false) {
-            for (let i = 0; i < this.bios.length; i++) {
-                this.romTmp[i] = this.rom[i];
-                this.rom[i] = this.bios[i];
+            for (let byte in this.bios) {
+                this.romTmp[byte] = this.rom[byte];
+                this.rom[byte] = this.bios[byte];
             }
-        } else for (let i = 0; i < this.bios.length; i++) this.rom[i] = this.romTmp[i];
+        } else for (let byte in this.bios) this.rom[byte] = this.romTmp[byte];
     }
 
     read8(address) {
@@ -77,7 +77,7 @@ class MMU {
         switch ((address & 0xFFFF) >> 12) {
             case 0: case 1: case 2: case 3:
             case 4: case 5: case 6: case 7:
-                this.cart.cartWrite(addr, value);
+                this.cart.cartWrite(address, value);
                 break;
             case 0xC: case 0xD:
                 this.wRam[address & 0x1FFF] = (value & 0xFF);
@@ -109,11 +109,11 @@ class MMU {
         {
             cartRead: function (addr) {
                 switch (addr >> 14) {
-                    case 0: return this.rom[addr & 0x3FFF];
-                    case 1: return this.rom[addr & 0x7FFF];
+                    case 0: return this.rom[addr];
+                    case 1: return this.rom[addr];
                 }
             },
-            cartWrite: function () { },
+            cartWrite: function (addr, value) { },
         }
 
     cartType_MBC1 =
@@ -121,21 +121,27 @@ class MMU {
             bankMask: 0,
             cartRead: function (addr) {
                 switch (addr >> 14) {
-                    case 0: return this.rom[addr]; // 0x000 - 0x3FFF ROM Bank 00 (Read Only)
-                    case 1: return this.rom[(addr + this.bankMask)]// 0x4000 - 0x7FFF - ROM Bank 01-7F (Read Only)
+                    case 0: return this.rom[addr & 0x3FFF]; // 0x000 - 0x3FFF ROM Bank 00 (Read Only)
+                    case 1: return this.rom[this.bankMask + addr];// 0x4000 - 0x7FFF - ROM Bank 01-7F (Read Only)
                     case 2: break; // A000-BFFF - RAM Bank 00-03, if any (Read/Write)
                 }
             },
             cartWrite: function (addr, value) {
                 switch (addr >> 12) {
                     case 0: case 1: //0x0000 - 0x1FFF RAM Enable (Write Only)
+                    console.log("Write ram enable");
                         if ((value & 0xF) === 0xA) {
                             // ram enable...
                         } else { }; break; // ram disable...
                     case 2: case 3: // 0x2000 - 0x3FFF ROM Bank Number (Write Only)
-                        let bank = value & 0x11111;
-                        this.bankMask = 0x4000 * bank;
+                        let bank = value & 0x1F;
+                        this.bankMask = (0x4000 * bank) - 0x4000;
+                        console.log("BANK: ", bank, "MASK: ", this.bankMask.toString(16));
                         break;
+                    case 4: case 5: // 4000-5FFF - RAM Bank Number - or - Upper Bits of ROM Bank Number (Write Only)
+                    console.log("4 5");
+                    break;
+
                 }
             },
         }
