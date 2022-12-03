@@ -13,10 +13,10 @@ const ppu = new PPU();
 const bus = new Bus();
 
 bus.init(cpu, mmu, ppu);
-cpu.init(mmu, bus);
+cpu.init(mmu, bus, io);
 io.init(mmu, cpu, ppu);
 mmu.init(io);
-ppu.init(io);
+ppu.init(io, cpu);
 
 function updateDebug() {
 
@@ -79,20 +79,17 @@ function runFrame() {
 
     while (cyclesThisTick < MAX_CYCLES) {
 
-        if (cpu.debug) {
-            // updateDebug();
-            console.log(`PC: ${cpu.reg.PC.toString(16)} OC: ${cpu.bus.read8(cpu.reg.PC).toString(16)} AF: ${cpu.reg.AF.toString(16)} BC: ${cpu.reg.BC.toString(16)} DE: ${cpu.reg.DE.toString(16)} HL: ${cpu.reg.HL.toString(16)} SP:  ${cpu.reg.SP.toString(16)}`);
-        }
+
         cpu.tick();
         ppu.tick(cpu.m);
-        if (cpu.reg.PC === 0xDEF9 && cpu.OC === 0xC7) {
-            // 0xC6B8
-            // CC52
-            // DEF8
-            console.log(`PC: ${cpu.reg.PC.toString(16)} OC: ${cpu.bus.read8(cpu.reg.PC).toString(16)} AF: ${cpu.reg.AF.toString(16)} BC: ${cpu.reg.BC.toString(16)} DE: ${cpu.reg.DE.toString(16)} HL: ${cpu.reg.HL.toString(16)} SP:  ${cpu.reg.SP.toString(16)}`);
-
-            // debug = true;
-        }
+        // if (cpu.reg.PC === 0x6639) {
+        //     // console.log(`PC: ${cpu.reg.PC.toString(16)} OC: ${cpu.bus.read8(cpu.reg.PC).toString(16)} AF: ${cpu.reg.AF.toString(16)} BC: ${cpu.reg.BC.toString(16)} DE: ${cpu.reg.DE.toString(16)} HL: ${cpu.reg.HL.toString(16)} SP:  ${cpu.reg.SP.toString(16)}`);
+        //     debug = true;
+        // }
+        // if (debug) {
+        //     // updateDebug();
+        //     console.log(`PC: ${cpu.reg.PC.toString(16)} OC: ${cpu.bus.read8(cpu.reg.PC).toString(16)} AF: ${cpu.reg.AF.toString(16)} BC: ${cpu.reg.BC.toString(16)} DE: ${cpu.reg.DE.toString(16)} HL: ${cpu.reg.HL.toString(16)} SP:  ${cpu.reg.SP.toString(16)}`);
+        // }
 
         cyclesThisTick += cpu.m;
 
