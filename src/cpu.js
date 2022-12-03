@@ -7,11 +7,13 @@ class CPU {
         this.OC = 0x00;
         this.debug = false;
         this.totalCycles = 0;
+        this.ime = false;
     };
 
-    init(mmu, bus) {
+    init(mmu, bus, io) {
         this.mmu = mmu;
         this.bus = bus;
+        this.io = io.register;
         this.reg.bus = bus; // really ?
     }
 
@@ -79,6 +81,26 @@ class CPU {
             updateDebug();
         };
         instructions[this.OC](this);
+        this.intrHandle();
+    }
+
+    intrRequest(bit) {
+        this.io[0x0F] |= (1 << bit);
+    }
+
+    intrHandle() {
+        if (this.ime) {
+            for (let mask = 1, bit = 0; mask < 0x20; mask <<= 1, bit++) {
+                if (this.mmu.hram[0x7F] & mask && this.io[0x0F] & mask) {
+                    this.push16(this.reg.PC);
+                    this.reg.PC = 0x40 + (bit * 0x8);
+
+                    this.io[0x0F] &= ~(mask);
+                    this.ime = false;
+                    return;
+                }
+            }
+        }
     }
 };
 // instructions
@@ -213,7 +235,7 @@ CPU.prototype.rlca = function (u8) { // 000C
 
 CPU.prototype.rrca = function (u8) { // 000C
     let carry = this.reg.A & 0x1;
-    this.reg.A = ((this.reg.A >> 1 | carry << 7)) & 0xFF;
+    this.reg.A = ((this.reg.A >> 1 | carry * 0x80)) & 0xFF;
 
     this.setFlag(ZERO, false);
     this.setFlag(HALF_CARRY, false);
@@ -223,7 +245,7 @@ CPU.prototype.rrca = function (u8) { // 000C
 
 CPU.prototype.rra = function (u8) { // 000C
     let carry = this.reg.A & 0x1;
-    this.reg.A = ((this.reg.A >> 1 | (this.getFlag(CARRY)) << 7)) & 0xFF;
+    this.reg.A = ((this.reg.A >> 1 | (this.getFlag(CARRY)) * 0x80)) & 0xFF;
 
     this.setFlag(ZERO, false);
     this.setFlag(HALF_CARRY, false);
