@@ -1,3 +1,4 @@
+import { CPU } from "./cpu.js";
 import cbInstructions from "./instructionsCB.js";
 
 const instructions = {
@@ -22,7 +23,7 @@ const instructions = {
     0x0D: (cpu) => { cpu.decR(C); cpu.m = 1 }, // DEC C
     0x0E: (cpu) => { cpu.reg.C = cpu.bus.next8(); cpu.m = 2 }, // LD C, u8
     0x0F: (cpu) => { cpu.rrca(); cpu.m = 1; },// RRCA
-    // 0x10: // STOP
+    0x10: (cpu) => { cpu.m = 1 }, // STOP
     0x11: (cpu) => { cpu.reg.DE = cpu.bus.next16(); cpu.m = 3 }, // LD DE, u16
     0x12: (cpu) => { cpu.reg._DE_ = cpu.reg.A; cpu.m = 2 }, // LD (DE), A
     0x13: (cpu) => { cpu.reg.DE++; cpu.m = 2 }, // INC DE
@@ -45,7 +46,24 @@ const instructions = {
     0x24: (cpu) => { cpu.incR(H); cpu.m = 1 }, // INC H
     0x25: (cpu) => { cpu.decR(H); cpu.m = 1 }, // DEC H
     0x26: (cpu) => { cpu.reg.H = cpu.bus.next8(); cpu.m = 2 }, // LD H, u8
-    // 0x27: // DAA
+    0x27: (cpu) => {
+        if (!cpu.getFlag(NEGATIVE)) {
+            if ((cpu.getFlag(CARRY)) || cpu.reg.A > 0x99) {
+                cpu.reg.A = (cpu.reg.A + 0x60) & 0xFF;
+                cpu.setFlag(CARRY, true);
+            }
+            if ((cpu.getFlag(HALF_CARRY)) || (cpu.reg.A & 0xF) > 0x09) {
+                cpu.reg.A = (cpu.reg.A + 0x6) & 0xFF;
+                cpu.setFlag(HALF_CARRY, false);
+            }
+        } else {
+            if (cpu.getFlag(CARRY)) cpu.reg.A = (cpu.reg.A - 0x60) & 0xFF;
+            if (cpu.getFlag(HALF_CARRY)) cpu.reg.A = (cpu.reg.A - 0x6) & 0xFF;
+        }
+        cpu.setFlag(ZERO, (cpu.reg.A === 0));
+        cpu.setFlag(HALF_CARRY, false);
+        cpu.m = 1;
+    }, // DAA
     0x28: (cpu) => { cpu.jr((cpu.reg.F & ZERO) === ZERO) }, // JR Z, i8
     0x29: (cpu) => { cpu.add16(cpu.reg.HL); cpu.m = 2 }, // ADD HL, HL
     0x2A: (cpu) => { cpu.reg.A = cpu.reg._HL_; cpu.reg.HL++; cpu.m = 2 }, // LD A, (HL+)
@@ -124,7 +142,7 @@ const instructions = {
     0x73: (cpu) => { cpu.reg._HL_ = cpu.reg.E; cpu.m = 1 },
     0x74: (cpu) => { cpu.reg._HL_ = cpu.reg.H; cpu.m = 1 },
     0x75: (cpu) => { cpu.reg._HL_ = cpu.reg.L; cpu.m = 1 },
-    // 0x76: (cpu) => { cpu.reg._HL_ = cpu.reg._HL_; cpu.m = 2 },
+    0x76: (cpu) => { cpu.m = 1 }, // HALT
     0x77: (cpu) => { cpu.reg._HL_ = cpu.reg.A; cpu.m = 1 },
     0x78: (cpu) => { cpu.reg.A = cpu.reg.B; cpu.m = 1 },
     0x79: (cpu) => { cpu.reg.A = cpu.reg.C; cpu.m = 1 },
@@ -212,23 +230,26 @@ const instructions = {
     0xCC: (cpu) => { cpu.call((cpu.reg.F & ZERO) === ZERO) }, // CALL Z
     0xCD: (cpu) => { cpu.call(true) }, // CALL u16
     0xCE: (cpu) => { cpu.adc(cpu.bus.next8()); cpu.m = 2 }, // ADC, u8
+    0xCF: (cpu) => { cpu.push16(cpu.reg.PC); cpu.reg.PC = 0x0008; cpu.m = 4; }, // RST 08
     0xD0: (cpu) => { cpu.retCond((cpu.reg.F & CARRY) !== CARRY) }, // RET NC
     0xD1: (cpu) => { cpu.reg.DE = cpu.pop16(); cpu.m = 3 }, // POP DE
     0XD2: (cpu) => { cpu.jp((cpu.reg.F & CARRY) !== CARRY) }, // JP NC, u16
     0xD4: (cpu) => { cpu.call((cpu.reg.F & CARRY) !== CARRY) }, // CALL NC, u16
     0xD5: (cpu) => { cpu.push16(cpu.reg.DE); cpu.m = 4 }, // PUSH DE
     0xD6: (cpu) => { cpu.sub(cpu.bus.next8()); cpu.m = 2 }, // SUB, u8
+    0xD7: (cpu) => { cpu.push16(cpu.reg.PC); cpu.reg.PC = 0x0010; cpu.m = 4; }, // RST 10
     0xD8: (cpu) => { cpu.retCond((cpu.reg.F & CARRY) === CARRY) }, // RET C
-    0xD9: (cpu) => { cpu.reg.PC = cpu.pop16(); cpu.m = 4; }, // RETI (enable flags later)
+    0xD9: (cpu) => { cpu.reg.PC = cpu.pop16(); cpu.m = 4; cpu.ime = true; }, // RETI (enable flags later)
     0xDA: (cpu) => { cpu.jp((cpu.reg.F & CARRY) === CARRY) }, // JP C
+    0xDE: (cpu) => { cpu.sbc(cpu.bus.next8()); cpu.m = 2; }, // SBC A
     0xDC: (cpu) => { cpu.call((cpu.reg.F & CARRY) === CARRY) }, // CALL C, u16
-    // 0xD2: (cpu) => { cpu.call((cpu.reg.F & CARRY) === 0x00) },
-    
+    0xDF: (cpu) => { cpu.push16(cpu.reg.PC); cpu.reg.PC = 0x0018; cpu.m = 4; }, // RST 18
     0xE0: (cpu) => { cpu.bus.write8(0xFF00 + cpu.bus.next8(), cpu.reg.A); cpu.m = 3 }, // LD (FF00 + u8), A
     0xE1: (cpu) => { cpu.reg.HL = cpu.pop16(); cpu.m = 3 }, // POP HL
     0xE2: (cpu) => { cpu.bus.write8(0xFF00 + cpu.reg.C, cpu.reg.A); cpu.m = 2 }, // LD (C), A
     0xE5: (cpu) => { cpu.push16(cpu.reg.HL); cpu.m = 4 }, // PUSH HL
     0xE6: (cpu) => { cpu.and(cpu.bus.next8()); cpu.m = 2 }, // AND, u8
+    0xE7: (cpu) => { cpu.push16(cpu.reg.PC); cpu.reg.PC = 0x0020; cpu.m = 4; }, // RST 20
     0xE8: (cpu) => {
         let s8 = cpu.bus.next8() << 24 >> 24;
         let tmp0 = (cpu.reg.SP + s8);
@@ -243,11 +264,14 @@ const instructions = {
     0xE9: (cpu) => { cpu.reg.PC = cpu.reg.HL; cpu.m = 1 }, // JP HL
     0xEA: (cpu) => { cpu.bus.write8(cpu.bus.next16(), cpu.reg.A); cpu.m = 4 }, // LD (u16), A
     0xEE: (cpu) => { cpu.xor(cpu.bus.next8()); cpu.m = 2 }, // XOR A, U8
+    0xEF: (cpu) => { cpu.push16(cpu.reg.PC); cpu.reg.PC = 0x0028; cpu.m = 4; }, // RST 28
     0xF0: (cpu) => { cpu.reg.A = cpu.bus.read8(0xFF00 + cpu.bus.next8()); cpu.m = 3 },
     0xF1: (cpu) => { cpu.reg.AF = cpu.pop16(); cpu.m = 3 }, // POP AF
     0xF2: (cpu) => { cpu.reg.A = cpu.bus.read8(0xFF00 + cpu.reg.C); cpu.m = 2; }, // LD A (0xFF00 + C)
-    0xF3: (cpu) => { cpu.m = 1 }, // DI
+    0xF3: (cpu) => { cpu.ime = false; cpu.m = 1 }, // DI
     0xF5: (cpu) => { cpu.push16(cpu.reg.AF); cpu.m = 4 }, // PUSH AF
+    0xF6: (cpu) => { cpu.or(cpu.bus.next8()); cpu.m = 2}, // OR, u8
+    0xF7: (cpu) => { cpu.push16(cpu.reg.PC); cpu.reg.PC = 0x0030; cpu.m = 4; }, // RST 30
     0xF8: (cpu) => {
         let s8 = cpu.bus.next8() << 24 >> 24;
         let tmp0 = (cpu.reg.SP + s8);
@@ -261,8 +285,9 @@ const instructions = {
     },
     0xF9: (cpu) => { cpu.reg.SP = cpu.reg.HL; cpu.m = 2}, // LD SP, HL
     0xFA: (cpu) => { cpu.reg.A = cpu.bus.read8(cpu.bus.next16()); cpu.m = 4 },
-    0xFB: (cpu) => { cpu.m = 1 }, // EI
+    0xFB: (cpu) => { cpu.ime = true; cpu.m = 1 }, // EI
     0xFE: (cpu) => { cpu.cp(cpu.bus.next8()); cpu.m = 2 }, // CP A, u8
+    0xFF: (cpu) => { cpu.push16(cpu.reg.PC); cpu.reg.PC = 0x0038; cpu.m = 4; }, // RST 38
     0xCB: (cpu) => {
         cpu.OC = cpu.bus.next8();
         let cbInst = cbInstructions[cpu.OC];
