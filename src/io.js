@@ -9,15 +9,15 @@ class IO {
     }
 
     write8(address, value) {
-        this.register[address & 0x7F] = (value & 0xFF);
         switch (address & 0xFF) {
-            case 0x47: this.ppu.updatePalette(0xFC & 0xFF); break;
+            case 0x47: this.ppu.updatePalette(value); break;
             case 0x42: this.register[0x42] = value; break;
             case 0x50: if (this.mmu.biosOff === false) { this.mmu.biosOff = true; this.mmu.loadRom(); } break;
             default:
                 this.register[address & 0x7F] = (value & 0xFF);
                 break;
         }
+        this.register[address & 0x7F] = (value & 0xFF);
     }
 
     read8(address) {
