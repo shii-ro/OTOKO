@@ -127,36 +127,30 @@ class PPU {
     }
 
     drawScanline(scanline) {
-        let bgTileDataArea = ((this.io[regLCDC] & LCDC.BGWindowTileDataArea) === LCDC.BGWindowTileDataArea) ? 0x0000 : 0x0800;
+        let bgTileDataArea = ((this.io[regLCDC] & LCDC.BGWindowTileDataArea) === LCDC.BGWindowTileDataArea) ? 0x0000 : 0x1000;
         let bgTileMapArea = ((this.io[regLCDC] & LCDC.BGTileMapArea) === LCDC.BGTileMapArea) ? 0x1C00 : 0x1800;
-        let basePointer = ((this.io[regLCDC] & LCDC.BGWindowTileDataArea) === LCDC.BGWindowTileDataArea) ? 0x0000 : 0x0800;
 
-
-        let tile_no = 0;
         let tiledata_l = 0;
         let tiledata_h = 0;
         let tiledata = 0;
         let tile_y = Math.floor(((scanline + this.io[regSCY]) & 0xFF) / 8) * 32; // i lost so much time debugging...
-        let y_pos = 2 * ((scanline + this.io[regSCY]) % 8);
+        let y_pos = 2 * ((scanline + this.io[regSCY]) & 0x7);
         let pixel = 0;
         let tile_n = (bgTileDataArea) ? this.tile_i8 : this.tile_u8;
-        let offset;
+        let scanlineOffset = scanline * 160;
 
-        for (let square = 0; square < 20; square++) {
-            tile_n[0] = this.vram[bgTileMapArea + (tile_y + square)];
+        for (let square = 20; square--;) {
+            tile_n[0] = this.vram[bgTileMapArea + (tile_y + square) + (Math.floor((this.io[regSCX] / 8) & 0x1F))];
             let offset = (tile_n[0] * 0x10);
-            // if (bgTileDataArea) {
-            //     console.log(`Map address: ${(bgTileMapArea + (tile_y + square)).toString(16)} Data address: ${((basePointer + offset) + y_pos).toString(16)}`);
-            //     // console.log((bgTileMapArea + (tile_y + square)).toString(16), tile_n[0].toString(16), (basepointer + (tile_n[0] * 0x10)).toString(16), this.vram[0x1800].toString(16));
-            // }
+            let tileOffset = square * 8;
 
-            tiledata_l = this.vram[(basePointer + offset) + bgTileDataArea + y_pos];
-            tiledata_h = this.vram[(basePointer + offset) + bgTileDataArea + y_pos + 1];
+            tiledata_l = this.vram[offset + bgTileDataArea + y_pos];
+            tiledata_h = this.vram[offset + bgTileDataArea + y_pos + 1];
             tiledata = this.decoded[tiledata_h][tiledata_l];
 
-            for (let x = 0; x < 8; x++) {
+            for (let x = 8; x--;) {
                 pixel = tiledata[x];
-                let point = (((square * 8) + x) + (scanline * 160)) * 4;
+                let point = ((tileOffset + x) + scanlineOffset) << 2;
                 let color = COLORS[this.palette[pixel]];
 
                 this.imageData.data[point + 0] = color[0];        // R value
