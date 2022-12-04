@@ -12,8 +12,3 @@ const BC = 'BC';
 const DE = 'DE';
 const HL = 'HL';
 const _HL_ = '_HL_';
-
-const ZERO = 1 << 7;
-const NEGATIVE = 1 << 6;
-const HALF_CARRY = 1 << 5;
-const CARRY = 1 << 4;

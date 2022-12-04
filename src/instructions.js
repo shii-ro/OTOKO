@@ -39,7 +39,7 @@ const instructions = {
     0x1D: (cpu) => { cpu.decR(E); cpu.m = 1 }, // DEC E
     0x1E: (cpu) => { cpu.reg.E = cpu.bus.next8(); cpu.m = 2 }, // LD E, u8
     0x1F: (cpu) => { cpu.rra(); cpu.m = 1 }, // RRA
-    0x20: (cpu) => { cpu.jr((cpu.reg.F & ZERO) !== ZERO) }, // JR NZ, i8
+    0x20: (cpu) => { cpu.jr(!cpu.flags.zero) }, // JR NZ, i8
     0x21: (cpu) => { cpu.reg.HL = cpu.bus.next16(); cpu.m = 3 }, // LD DE, u16
     0x22: (cpu) => { cpu.reg._HL_ = cpu.reg.A; cpu.reg.HL++; cpu.m = 2 }, // LD (HL+), A
     0x23: (cpu) => { cpu.reg.HL++; cpu.m = 2 }, // INC HL
@@ -47,47 +47,47 @@ const instructions = {
     0x25: (cpu) => { cpu.decR(H); cpu.m = 1 }, // DEC H
     0x26: (cpu) => { cpu.reg.H = cpu.bus.next8(); cpu.m = 2 }, // LD H, u8
     0x27: (cpu) => {
-        if (!cpu.getFlag(NEGATIVE)) {
-            if ((cpu.getFlag(CARRY)) || cpu.reg.A > 0x99) {
+        if (!cpu.flags.negative) {
+            if ((cpu.flags.carry) || cpu.reg.A > 0x99) {
                 cpu.reg.A = (cpu.reg.A + 0x60) & 0xFF;
-                cpu.setFlag(CARRY, true);
+                cpu.flags.carry = true;
             }
-            if ((cpu.getFlag(HALF_CARRY)) || (cpu.reg.A & 0xF) > 0x09) {
+            if ((cpu.flags.halfCarry) || (cpu.reg.A & 0xF) > 0x09) {
                 cpu.reg.A = (cpu.reg.A + 0x6) & 0xFF;
-                cpu.setFlag(HALF_CARRY, false);
+                cpu.flags.halfCarry = false;
             }
         } else {
-            if (cpu.getFlag(CARRY)) cpu.reg.A = (cpu.reg.A - 0x60) & 0xFF;
-            if (cpu.getFlag(HALF_CARRY)) cpu.reg.A = (cpu.reg.A - 0x6) & 0xFF;
+            if (cpu.flags.carry) cpu.reg.A = (cpu.reg.A - 0x60) & 0xFF;
+            if (cpu.flags.halfCarry) cpu.reg.A = (cpu.reg.A - 0x6) & 0xFF;
         }
-        cpu.setFlag(ZERO, (cpu.reg.A === 0));
-        cpu.setFlag(HALF_CARRY, false);
+        cpu.flags.zero = (cpu.reg.A === 0);
+        cpu.flags.halfCarry = false;
         cpu.m = 1;
     }, // DAA
-    0x28: (cpu) => { cpu.jr((cpu.reg.F & ZERO) === ZERO) }, // JR Z, i8
+    0x28: (cpu) => { cpu.jr(cpu.flags.zero) }, // JR Z, i8
     0x29: (cpu) => { cpu.add16(cpu.reg.HL); cpu.m = 2 }, // ADD HL, HL
     0x2A: (cpu) => { cpu.reg.A = cpu.reg._HL_; cpu.reg.HL++; cpu.m = 2 }, // LD A, (HL+)
     0x2B: (cpu) => { cpu.reg.HL--; cpu.m = 2 }, // DEC HL
     0x2C: (cpu) => { cpu.incR(L); cpu.m = 1 }, // INC L
     0x2D: (cpu) => { cpu.decR(L); cpu.m = 1 }, // DEC L
     0x2E: (cpu) => { cpu.reg.L = cpu.bus.next8(); cpu.m = 2 }, // LD L, u8
-    0x2F: (cpu) => { cpu.reg.A = cpu.reg.A ^ 0xFF; cpu.setFlag(NEGATIVE, true); cpu.setFlag(HALF_CARRY, true); cpu.m = 1; },// CPL
-    0x30: (cpu) => { cpu.jr((cpu.reg.F & CARRY) !== CARRY) }, // JR NC, i8
+    0x2F: (cpu) => { cpu.reg.A = cpu.reg.A ^ 0xFF; cpu.flags.negative = true; cpu.flags.halfCarry = true; cpu.m = 1; },// CPL
+    0x30: (cpu) => { cpu.jr(!cpu.flags.carry) }, // JR NC, i8
     0x31: (cpu) => { cpu.reg.SP = cpu.bus.next16(); cpu.m = 3 }, // LD SP, u16
     0x32: (cpu) => { cpu.reg._HL_ = cpu.reg.A; cpu.reg.HL--; cpu.m = 2 }, // LD (HL-),  A
     0x33: (cpu) => { cpu.reg.SP++; cpu.m = 2 }, // INC SP
     0x34: (cpu) => { cpu.incR(_HL_); cpu.m = 3 }, // INC (HL)
     0x35: (cpu) => { cpu.decR(_HL_); cpu.m = 3 }, // DEC (HL)
     0x36: (cpu) => { cpu.reg._HL_ = cpu.bus.next8(); cpu.m = 3 },
-    0x37: (cpu) => { cpu.setFlag(CARRY, true); cpu.setFlag(NEGATIVE, false); cpu.setFlag(HALF_CARRY, false); },
-    0x38: (cpu) => { cpu.jr((cpu.reg.F & CARRY) === CARRY) }, // ADD 
+    0x37: (cpu) => { cpu.flags.carry = true; cpu.flags.negative = false; cpu.flags.halfCarry = false; },
+    0x38: (cpu) => { cpu.jr(cpu.flags.carry) }, // ADD 
     0x39: (cpu) => { cpu.add16(cpu.reg.SP); cpu.m = 2 }, // ADD HL, SP
     0x3A: (cpu) => { cpu.reg.A = cpu.reg._HL_; cpu.reg.HL--; cpu.m = 2 }, // LD A, (HL-)
     0x3B: (cpu) => { cpu.reg.SP--; cpu.m = 2 }, // DEC SP
     0x3C: (cpu) => { cpu.incR(A); cpu.m = 1 }, // INC A
     0x3D: (cpu) => { cpu.decR(A); cpu.m = 1 }, // DEC A
     0x3E: (cpu) => { cpu.reg.A = cpu.bus.next8(); cpu.m = 2 },
-    0x3F: (cpu) => { cpu.setFlag(CARRY, cpu.getFlag(CARRY) ^ 1); cpu.setFlag(NEGATIVE, false); cpu.setFlag(HALF_CARRY, false); cpu.m = 1 }, // SCF
+    0x3F: (cpu) => { cpu.flags.carry = !cpu.flags.carry; cpu.flags.negative = false; cpu.flags.halfCarry = false; cpu.m = 1 }, // SCF
     0x40: (cpu) => { cpu.reg.B = cpu.reg.B; cpu.m = 1 },
     0x41: (cpu) => { cpu.reg.B = cpu.reg.C; cpu.m = 1 },
     0x42: (cpu) => { cpu.reg.B = cpu.reg.D; cpu.m = 1 },
@@ -95,7 +95,7 @@ const instructions = {
     0x44: (cpu) => { cpu.reg.B = cpu.reg.H; cpu.m = 1 },
     0x45: (cpu) => { cpu.reg.B = cpu.reg.L; cpu.m = 1 },
     0x46: (cpu) => { cpu.reg.B = cpu.reg._HL_; cpu.m = 2 },
-    0x47: (cpu) => { cpu.reg.B = cpu.reg.A; cpu.m = 1 }, 
+    0x47: (cpu) => { cpu.reg.B = cpu.reg.A; cpu.m = 1 },
     0x48: (cpu) => { cpu.reg.C = cpu.reg.B; cpu.m = 1 },
     0x49: (cpu) => { cpu.reg.C = cpu.reg.C; cpu.m = 1 },
     0x4A: (cpu) => { cpu.reg.C = cpu.reg.D; cpu.m = 1 },
@@ -216,33 +216,33 @@ const instructions = {
     0xBD: (cpu) => { cpu.cp(cpu.reg.L); cpu.m = 1 },
     0xBE: (cpu) => { cpu.cp(cpu.reg._HL_); cpu.m = 2 },
     0xBF: (cpu) => { cpu.cp(cpu.reg.A); cpu.m = 1 },
-    0xC0: (cpu) => { cpu.retCond((cpu.reg.F & ZERO) !== ZERO) }, // RET NZ
+    0xC0: (cpu) => { cpu.retCond(!cpu.flags.zero) }, // RET NZ
     0xC1: (cpu) => { cpu.reg.BC = cpu.pop16(); cpu.m = 3 }, // POP BC
-    0xC2: (cpu) => { cpu.jp((cpu.reg.F & ZERO) !== ZERO) }, // JP NZ, u16
+    0xC2: (cpu) => { cpu.jp(!cpu.flags.zero) }, // JP NZ, u16
     0xC3: (cpu) => { cpu.reg.PC = cpu.bus.next16(), cpu.m = 3 }, // JMP u16
-    0xC4: (cpu) => { cpu.call((cpu.reg.F & ZERO) !== ZERO) }, // CALL NZ, u16
+    0xC4: (cpu) => { cpu.call(!cpu.flags.zero) }, // CALL NZ, u16
     0xC5: (cpu) => { cpu.push16(cpu.reg.BC); cpu.m = 4 }, // PUSH BC
     0xC6: (cpu) => { cpu.add(cpu.bus.next8()); cpu.m = 2 }, //  ADD A ,u8
     0xC7: (cpu) => { cpu.push16(cpu.reg.PC); cpu.reg.PC = 0x0000; cpu.m = 4; }, // RST 00
-    0xC8: (cpu) => { cpu.retCond((cpu.reg.F & ZERO) === ZERO) }, // RET Z
+    0xC8: (cpu) => { cpu.retCond(cpu.flags.zero) }, // RET Z
     0xC9: (cpu) => { cpu.reg.PC = cpu.pop16(); cpu.m = 4; }, // RET
-    0xCA: (cpu) => { cpu.jp((cpu.reg.F & ZERO) === ZERO) }, // JP Z, u16
-    0xCC: (cpu) => { cpu.call((cpu.reg.F & ZERO) === ZERO) }, // CALL Z
+    0xCA: (cpu) => { cpu.jp(cpu.flags.zero) }, // JP Z, u16
+    0xCC: (cpu) => { cpu.call(cpu.flags.zero) }, // CALL Z
     0xCD: (cpu) => { cpu.call(true) }, // CALL u16
     0xCE: (cpu) => { cpu.adc(cpu.bus.next8()); cpu.m = 2 }, // ADC, u8
     0xCF: (cpu) => { cpu.push16(cpu.reg.PC); cpu.reg.PC = 0x0008; cpu.m = 4; }, // RST 08
-    0xD0: (cpu) => { cpu.retCond((cpu.reg.F & CARRY) !== CARRY) }, // RET NC
+    0xD0: (cpu) => { cpu.retCond(!cpu.flags.carry) }, // RET NC
     0xD1: (cpu) => { cpu.reg.DE = cpu.pop16(); cpu.m = 3 }, // POP DE
-    0XD2: (cpu) => { cpu.jp((cpu.reg.F & CARRY) !== CARRY) }, // JP NC, u16
-    0xD4: (cpu) => { cpu.call((cpu.reg.F & CARRY) !== CARRY) }, // CALL NC, u16
+    0XD2: (cpu) => { cpu.jp(!cpu.flags.carry) }, // JP NC, u16
+    0xD4: (cpu) => { cpu.call(!cpu.flags.carry) }, // CALL NC, u16
     0xD5: (cpu) => { cpu.push16(cpu.reg.DE); cpu.m = 4 }, // PUSH DE
     0xD6: (cpu) => { cpu.sub(cpu.bus.next8()); cpu.m = 2 }, // SUB, u8
     0xD7: (cpu) => { cpu.push16(cpu.reg.PC); cpu.reg.PC = 0x0010; cpu.m = 4; }, // RST 10
-    0xD8: (cpu) => { cpu.retCond((cpu.reg.F & CARRY) === CARRY) }, // RET C
+    0xD8: (cpu) => { cpu.retCond(cpu.flags.carry) }, // RET C
     0xD9: (cpu) => { cpu.reg.PC = cpu.pop16(); cpu.m = 4; cpu.ime = true; }, // RETI (enable flags later)
-    0xDA: (cpu) => { cpu.jp((cpu.reg.F & CARRY) === CARRY) }, // JP C
+    0xDA: (cpu) => { cpu.jp(cpu.flags.carry) }, // JP C
     0xDE: (cpu) => { cpu.sbc(cpu.bus.next8()); cpu.m = 2; }, // SBC A
-    0xDC: (cpu) => { cpu.call((cpu.reg.F & CARRY) === CARRY) }, // CALL C, u16
+    0xDC: (cpu) => { cpu.call(cpu.flags.carry) }, // CALL C, u16
     0xDF: (cpu) => { cpu.push16(cpu.reg.PC); cpu.reg.PC = 0x0018; cpu.m = 4; }, // RST 18
     0xE0: (cpu) => { cpu.bus.write8(0xFF00 + cpu.bus.next8(), cpu.reg.A); cpu.m = 3 }, // LD (FF00 + u8), A
     0xE1: (cpu) => { cpu.reg.HL = cpu.pop16(); cpu.m = 3 }, // POP HL
@@ -254,10 +254,10 @@ const instructions = {
         let s8 = cpu.bus.next8() << 24 >> 24;
         let tmp0 = (cpu.reg.SP + s8);
         let tmp1 = cpu.reg.SP ^ s8 ^ tmp0;
-        cpu.setFlag(ZERO, false);
-        cpu.setFlag(NEGATIVE, false);
-        cpu.setFlag(HALF_CARRY, (tmp1 & 0x10) === 0x10);
-        cpu.setFlag(CARRY, (tmp1 & 0x100) === 0x100);
+        cpu.flags.zero = false;
+        cpu.flags.negative = false;
+        cpu.flags.halfCarry = ((tmp1 & 0x10) === 0x10);
+        cpu.flags.carry = ((tmp1 & 0x100) === 0x100);
         cpu.reg.SP = tmp0 & 0xFFFF;
         cpu.m = 4;
     },
@@ -270,20 +270,20 @@ const instructions = {
     0xF2: (cpu) => { cpu.reg.A = cpu.bus.read8(0xFF00 + cpu.reg.C); cpu.m = 2; }, // LD A (0xFF00 + C)
     0xF3: (cpu) => { cpu.ime = false; cpu.m = 1 }, // DI
     0xF5: (cpu) => { cpu.push16(cpu.reg.AF); cpu.m = 4 }, // PUSH AF
-    0xF6: (cpu) => { cpu.or(cpu.bus.next8()); cpu.m = 2}, // OR, u8
+    0xF6: (cpu) => { cpu.or(cpu.bus.next8()); cpu.m = 2 }, // OR, u8
     0xF7: (cpu) => { cpu.push16(cpu.reg.PC); cpu.reg.PC = 0x0030; cpu.m = 4; }, // RST 30
     0xF8: (cpu) => {
         let s8 = cpu.bus.next8() << 24 >> 24;
         let tmp0 = (cpu.reg.SP + s8);
         let tmp1 = cpu.reg.SP ^ s8 ^ tmp0;
         cpu.reg.HL = tmp0 & 0xFFFF;
-        cpu.setFlag(ZERO, false);
-        cpu.setFlag(NEGATIVE, false);
-        cpu.setFlag(HALF_CARRY, (tmp1 & 0x10) === 0x10);
-        cpu.setFlag(CARRY, (tmp1 & 0x100) === 0x100);
+        cpu.flags.zero = false;
+        cpu.flags.negative = false;
+        cpu.flags.halfCarry = ((tmp1 & 0x10) === 0x10);
+        cpu.flags.carry = ((tmp1 & 0x100) === 0x100);
         cpu.m = 3;
     },
-    0xF9: (cpu) => { cpu.reg.SP = cpu.reg.HL; cpu.m = 2}, // LD SP, HL
+    0xF9: (cpu) => { cpu.reg.SP = cpu.reg.HL; cpu.m = 2 }, // LD SP, HL
     0xFA: (cpu) => { cpu.reg.A = cpu.bus.read8(cpu.bus.next16()); cpu.m = 4 },
     0xFB: (cpu) => { cpu.ime = true; cpu.m = 1 }, // EI
     0xFE: (cpu) => { cpu.cp(cpu.bus.next8()); cpu.m = 2 }, // CP A, u8

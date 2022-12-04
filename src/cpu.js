@@ -18,12 +18,25 @@ class CPU {
     }
 
     reg = {
-        A: 0, B: 0, C: 0, D: 0, E: 0, F: 0, H: 0, L: 0, SP: 0, PC: 0,
+        A: 0, B: 0, C: 0, D: 0, E: 0, H: 0, L: 0, SP: 0, PC: 0,
+        flags: {
+            zero: false,
+            negative: false,
+            halfCarry: false,
+            carry: false,
+        },
 
-        get AF() { return this.A << 8 | this.F & 0xF0 }, set AF(u16) { [this.F, this.A] = [(u16 & 0xF0), (u16 >> 8)] },
-        get BC() { return this.B << 8 | this.C }, set BC(u16) { [this.C, this.B] = [(u16 & 0xFF), (u16 >> 8)] },
-        get DE() { return this.D << 8 | this.E }, set DE(u16) { [this.E, this.D] = [(u16 & 0xFF), (u16 >> 8)] },
-        get HL() { return this.H << 8 | this.L }, set HL(u16) { [this.L, this.H] = [(u16 & 0xFF), (u16 >> 8)] },
+        get F() { return (this.flags.zero << 7 | this.flags.negative << 6 | this.flags.halfCarry << 5 | this.flags.carry << 4) },
+        set F(u8) {
+            this.flags.zero = (((u8 >> 7) & 0x1));
+            this.flags.negative = (((u8 >> 6) & 0x1));
+            this.flags.halfCarry = (((u8 >> 5) & 0x1));
+            this.flags.carry = (((u8 >> 4) & 0x1))
+        },
+        get AF() { return (this.A << 8 | this.F) }, set AF(u16) { [this.F, this.A] = [(u16 & 0xF0), (u16 >> 8)] },
+        get BC() { return (this.B << 8 | this.C) }, set BC(u16) { [this.C, this.B] = [(u16 & 0xFF), (u16 >> 8)] },
+        get DE() { return (this.D << 8 | this.E) }, set DE(u16) { [this.E, this.D] = [(u16 & 0xFF), (u16 >> 8)] },
+        get HL() { return (this.H << 8 | this.L) }, set HL(u16) { [this.L, this.H] = [(u16 & 0xFF), (u16 >> 8)] },
 
         get _AF_() { return this.bus.read8(this.AF) }, set _AF_(u8) { this.bus.write8(this.AF, u8) },
         get _BC_() { return this.bus.read8(this.BC) }, set _BC_(u8) { this.bus.write8(this.BC, u8) },
@@ -31,28 +44,22 @@ class CPU {
         get _HL_() { return this.bus.read8(this.HL); }, set _HL_(u8) { this.bus.write8(this.HL, u8) },
     };
 
+    flags = this.reg.flags;
+
     decR = (register) => {
         let tmp = this.reg[register] - 1;
-        this.setFlag(ZERO, (tmp & 0xFF) === 0);
-        this.setFlag(NEGATIVE, true);
-        this.setFlag(HALF_CARRY, (tmp & 0xF) === 0xF);
+        this.flags.zero = ((tmp & 0xFF) === 0);
+        this.flags.negative = true;
+        this.flags.halfCarry = ((tmp & 0xF) === 0xF);
         this.reg[register] = tmp & 0xFF;
     }
 
     incR(register) { // Z0H
         let tmp = this.reg[register] + 1;
-        this.setFlag(ZERO, (tmp & 0xFF) === 0);
-        this.setFlag(NEGATIVE, false);
-        this.setFlag(HALF_CARRY, (tmp & 0xF) === 0);
+        this.flags.zero = ((tmp & 0xFF) === 0);
+        this.flags.negative = false;
+        this.flags.halfCarry = ((tmp & 0xF) === 0x0);
         this.reg[register] = tmp & 0xFF;
-    }
-    
-    setFlag(bit, condition) {
-        this.reg.F = (this.reg.F & ~(bit)) | (condition * bit);
-    };
-
-    getFlag(bit) {
-        return ((this.reg.F & bit) === bit);
     }
 
     push8(value) {
@@ -142,64 +149,70 @@ CPU.prototype.retCond = function (condition) {
 
 CPU.prototype.add = function (u8) { // Z0HC
     let tmp = this.reg.A + u8;
-    this.setFlag(ZERO, ((tmp & 0xFF) === 0));
-    this.setFlag(NEGATIVE, false);
-    this.setFlag(HALF_CARRY, (this.reg.A & 0xF) + (u8 & 0xF) > 0xF);
-    this.setFlag(CARRY, tmp > 0xFF);
+    this.flags.zero = ((tmp & 0xFF) === 0);
+    this.flags.negative = false;
+    this.flags.halfCarry = ((this.reg.A ^ u8 ^ tmp) & 0x10) === 0x10;
+    this.flags.carry = (tmp > 0xFF);
     this.reg.A = tmp & 0xFF;
 }
 
 CPU.prototype.add16 = function (u16) { // 0HC
     let tmp = this.reg.HL + u16;
-    this.setFlag(NEGATIVE, false);
-    this.setFlag(HALF_CARRY, ((this.reg.HL & 0xfff) + (u16 & 0xfff)) > 0xfff);
-    this.setFlag(CARRY, tmp > 0xFFFF);
+    this.flags.negative = false;
+    this.flags.halfCarry = ((this.reg.HL ^ u16 ^ tmp) & 0x1000) === 0x1000;
+    this.flags.carry = (tmp > 0xFFFF);
     this.reg.HL = tmp & 0xFFFF;
 }
 
 CPU.prototype.adc = function (u8) { // Z0HC
-    let tmp = this.reg.A + u8 + this.getFlag(CARRY);
-    this.setFlag(ZERO, ((tmp & 0xFF) === 0));
-    this.setFlag(NEGATIVE, false);
-    this.setFlag(HALF_CARRY, (this.reg.A & 0xF) + (u8 & 0xF) + this.getFlag(CARRY) > 0xF);
-    this.setFlag(CARRY, tmp > 0xFF);
+    let tmp = this.reg.A + u8 + this.flags.carry;
+    this.flags.zero = ((tmp & 0xFF) === 0);
+    this.flags.negative = false;
+    this.flags.halfCarry = ((this.reg.A ^ u8 ^ tmp) & 0x10) === 0x10;
+    this.flags.carry = (tmp > 0xFF);
     this.reg.A = tmp & 0xFF;
 }
 
 CPU.prototype.and = function (u8) { // Z010
     let tmp = this.reg.A & u8;
-    this.setFlag(ZERO, tmp === 0x00);
-    this.setFlag(NEGATIVE, false);
-    this.setFlag(HALF_CARRY, true);
-    this.setFlag(CARRY, false);
+    this.flags.zero = (tmp === 0x00);
+    this.flags.negative = false;
+    this.flags.halfCarry = true;
+    this.flags.carry = false;
     this.reg.A = tmp & 0xFF;
 }
 
 CPU.prototype.xor = function (u8) { // Z000
     this.reg.A = (this.reg.A ^ u8) & 0xFF;
-    this.reg.F = (this.reg.A === 0) ? 0x80 : 0x00;
+    this.flags.zero = (this.reg.A === 0x0);
+    this.flags.negative = false;
+    this.flags.halfCarry = false;
+    this.flags.carry = false;
 }
 
 CPU.prototype.or = function (u8) { // Z000
     this.reg.A = (this.reg.A | u8) & 0xFF;
-    this.reg.F = (this.reg.A === 0) ? 0x80 : 0x00;
+    this.flags.zero = (this.reg.A === 0x0);
+    this.flags.negative = false;
+    this.flags.halfCarry = false;
+    this.flags.carry = false;
 }
 
 CPU.prototype.sub = function (u8) { // Z1HC
     let tmp = this.reg.A - u8;
-    this.setFlag(ZERO, (tmp & 0xFF) === 0);
-    this.setFlag(NEGATIVE, true);
-    this.setFlag(HALF_CARRY, (((this.reg.A & 0xf) - (u8 & 0xf)) & 0x10) == 0x10);
-    this.setFlag(CARRY, u8 > this.reg.A); // check this line later
+    this.flags.zero = ((tmp & 0xFF) === 0);
+    this.flags.negative = true;
+    this.flags.halfCarry = ((this.reg.A ^ (u8) ^ tmp) & 0x10) === 0x10;
+    this.flags.carry = (u8 > this.reg.A); // check this line later
     this.reg.A = tmp & 0xFF;
 }
 
 CPU.prototype.sbc = function (u8) { // Z1HC
-    let tmp = this.reg.A - u8 - this.getFlag(CARRY);
-    this.setFlag(ZERO, (tmp & 0xFF) === 0);
-    this.setFlag(NEGATIVE, true);
-    this.setFlag(HALF_CARRY, ((this.reg.A & 0xf) - (u8 & 0xf) - this.getFlag(CARRY)) < 0);
-    this.setFlag(CARRY, (u8 + this.getFlag(CARRY)) > this.reg.A); // check this line later
+    let tmp = this.reg.A - u8 - this.flags.carry;
+    this.flags.zero = ((tmp & 0xFF) === 0);
+    this.flags.negative = true;
+    this.flags.halfCarry = ((this.reg.A ^ u8 ^ this.flags.carry ^ tmp) & 0x10) === 0x10;
+    this.flags.carry = ((u8 + this.flags.carry) > this.reg.A); // check this line later
     this.reg.A = tmp & 0xFF;
 }
 
@@ -207,135 +220,138 @@ CPU.prototype.sbc = function (u8) { // Z1HC
 
 CPU.prototype.cp = function (u8) { // Z1HC
     let tmp = this.reg.A - u8;
-    this.setFlag(ZERO, (tmp & 0xFF) === 0);
-    this.setFlag(NEGATIVE, true);
-    this.setFlag(HALF_CARRY, (((this.reg.A & 0xf) - (u8 & 0xf)) & 0x10) === 0x10);
-    this.setFlag(CARRY, u8 > this.reg.A); // check this line later
+    this.flags.zero = ((tmp & 0xFF) === 0);
+    this.flags.negative = true;
+    this.flags.halfCarry = ((this.reg.A ^ (u8) ^ tmp) & 0x10) === 0x10;
+    this.flags.carry = (u8 > this.reg.A); // check this line later
 }
 
 CPU.prototype.rla = function (u8) { // 000C
-    let carry = (this.reg.A >> 7) & 0x1;
-    this.reg.A = (this.reg.A << 1 | this.getFlag(CARRY)) & 0xFF;
+    let carry = (((this.reg.A >> 7) & 0x1) === 0x1);
+    this.reg.A = (this.reg.A << 1 | this.flags.carry) & 0xFF;
 
-    this.setFlag(ZERO, false);
-    this.setFlag(HALF_CARRY, false);
-    this.setFlag(NEGATIVE, false);
-    this.setFlag(CARRY, carry);
+    this.flags.zero = false;
+    this.flags.negative = false;
+    this.flags.halfCarry = false;
+    this.flags.carry = carry;
 }
 
 CPU.prototype.rlca = function (u8) { // 000C
-    let carry = (this.reg.A >> 7) & 0x1;
+    let carry = (((this.reg.A >> 7) & 0x1) === 0x1);
     this.reg.A = (this.reg.A << 1 | carry) & 0xFF;
 
-    this.setFlag(ZERO, false);
-    this.setFlag(HALF_CARRY, false);
-    this.setFlag(NEGATIVE, false);
-    this.setFlag(CARRY, carry);
+    this.flags.zero = false;
+    this.flags.negative = false;
+    this.flags.halfCarry = false;
+    this.flags.carry = carry;
 }
 
 CPU.prototype.rrca = function (u8) { // 000C
-    let carry = this.reg.A & 0x1;
+    let carry = ((this.reg.A & 0x1) === 0x1);
     this.reg.A = ((this.reg.A >> 1 | carry * 0x80)) & 0xFF;
 
-    this.setFlag(ZERO, false);
-    this.setFlag(HALF_CARRY, false);
-    this.setFlag(NEGATIVE, false);
-    this.setFlag(CARRY, carry);
+    this.flags.zero = false;
+    this.flags.negative = false;
+    this.flags.halfCarry = false;
+    this.flags.carry = carry;
 }
 
 CPU.prototype.rra = function (u8) { // 000C
-    let carry = this.reg.A & 0x1;
-    this.reg.A = ((this.reg.A >> 1 | (this.getFlag(CARRY)) * 0x80)) & 0xFF;
+    let carry = (this.reg.A & 0x1) === 0x1;
+    this.reg.A = (this.reg.A >> 1 | (this.flags.carry * 0x80)) & 0xFF;
 
-    this.setFlag(ZERO, false);
-    this.setFlag(HALF_CARRY, false);
-    this.setFlag(NEGATIVE, false);
-    this.setFlag(CARRY, carry);
+    this.flags.zero = false;
+    this.flags.negative = false;
+    this.flags.halfCarry = false;
+    this.flags.carry = carry;
 }
 
 // CB instructions
 CPU.prototype.cbBit = function (bitPos, u8) {
     let bit = (u8 >> bitPos) & 0x1;
-    this.setFlag(ZERO, !bit);
-    this.setFlag(NEGATIVE, false);
-    this.setFlag(HALF_CARRY, true);
+    this.flags.zero = (!bit);
+    this.flags.negative = false;
+    this.flags.halfCarry = true;
 }
 
 CPU.prototype.cbRr = function (register) {
-    let carry = this.reg[register] & 0x1;
-    this.reg[register] = ((this.reg[register] >> 1 | (this.getFlag(CARRY)) << 7)) & 0xFF;
+    let carry = ((this.reg[register] & 0x1) === 0x1);
+    this.reg[register] = ((this.reg[register] >> 1 | this.flags.carry << 7)) & 0xFF;
 
-    this.setFlag(ZERO, this.reg[register] === 0x00);
-    this.setFlag(HALF_CARRY, false);
-    this.setFlag(NEGATIVE, false);
-    this.setFlag(CARRY, carry);
+    this.flags.zero = (this.reg[register] === 0x00);
+    this.flags.halfCarry = false;
+    this.flags.negative = false;
+    this.flags.carry = carry;
 }
 
 CPU.prototype.cbRrc = function (register) {
-    let carry = this.reg[register] & 0x1;
+    let carry = (this.reg[register] & 0x1) === 0x1;
     this.reg[register] = ((this.reg[register] >> 1 | carry << 7)) & 0xFF;
 
-    this.setFlag(ZERO, this.reg[register] === 0x00);
-    this.setFlag(HALF_CARRY, false);
-    this.setFlag(NEGATIVE, false);
-    this.setFlag(CARRY, carry);
+    this.flags.zero = (this.reg[register] === 0x00);
+    this.flags.halfCarry = false;
+    this.flags.negative = false;
+    this.flags.carry = carry;
 }
 
 CPU.prototype.cbRlc = function (register) {
     let carry = (this.reg[register] >> 7) & 0x1;
     this.reg[register] = (this.reg[register] << 1 | carry) & 0xFF;
 
-    this.setFlag(ZERO, this.reg[register] === 0x00);
-    this.setFlag(HALF_CARRY, false);
-    this.setFlag(NEGATIVE, false);
-    this.setFlag(CARRY, carry);
+    this.flags.zero = (this.reg[register] === 0x00);
+    this.flags.halfCarry = false;
+    this.flags.negative = false;
+    this.flags.carry = carry;
 }
 
 CPU.prototype.cbRl = function (register) {
-    let carry = (this.reg[register] >> 7) & 0x1;
-    this.reg[register] = (this.reg[register] << 1 | this.getFlag(CARRY)) & 0xFF;
+    let carry = ((this.reg[register] >> 7) & 0x1) === 0x1;
+    this.reg[register] = (this.reg[register] << 1 | this.flags.carry) & 0xFF;
 
-    this.setFlag(ZERO, this.reg[register] === 0x00);
-    this.setFlag(HALF_CARRY, false);
-    this.setFlag(NEGATIVE, false);
-    this.setFlag(CARRY, carry);
+    this.flags.zero = (this.reg[register] === 0x00);
+    this.flags.halfCarry = false;
+    this.flags.negative = false;
+    this.flags.carry = carry;
 }
 
 CPU.prototype.cbSla = function (register) {
-    let carry = (this.reg[register] >> 7) & 0x1;
+    let carry = ((this.reg[register] >> 7) & 0x1) === 0x1;
     this.reg[register] = (this.reg[register] << 1) & 0xFF;
 
-    this.setFlag(ZERO, this.reg[register] === 0x00);
-    this.setFlag(HALF_CARRY, false);
-    this.setFlag(NEGATIVE, false);
-    this.setFlag(CARRY, carry);
+    this.flags.zero = (this.reg[register] === 0x00);
+    this.flags.halfCarry = false;
+    this.flags.negative = false;
+    this.flags.carry = carry;
 }
 
 CPU.prototype.cbSra = function (register) {
-    let carry = this.reg[register] & 0x1;
+    let carry = (this.reg[register] & 0x1) === 0x1;
     let b7 = this.reg[register] & 0x80;
     this.reg[register] = ((this.reg[register] >> 1) | b7) & 0xFF;
 
-    this.setFlag(ZERO, this.reg[register] === 0x00);
-    this.setFlag(HALF_CARRY, false);
-    this.setFlag(NEGATIVE, false);
-    this.setFlag(CARRY, carry);
+    this.flags.zero = (this.reg[register] === 0x00);
+    this.flags.halfCarry = false;
+    this.flags.negative = false;
+    this.flags.carry = carry;
 }
 
 
 CPU.prototype.cbSrl = function (register) {
     let tmp = this.reg[register] >> 1;
 
-    this.setFlag(ZERO, (tmp & 0xFF) === 0x00);
-    this.setFlag(HALF_CARRY, false);
-    this.setFlag(NEGATIVE, false);
-    this.setFlag(CARRY, this.reg[register] & 0x1);
+    this.flags.zero = ((tmp & 0xFF) === 0x00);
+    this.flags.halfCarry = false;
+    this.flags.negative = false;
+    this.flags.carry = (this.reg[register] & 0x1) === 0x1;
     this.reg[register] = tmp & 0xFF;
 }
 
 CPU.prototype.cbSwap = function (register) {
     this.reg[register] = (this.reg[register] & 0xF0) >> 4 | (this.reg[register] & 0x0F) << 4;
-    this.reg.F = (this.reg[register] === 0) ? 0x80 : 0x00
+    this.flags.zero = (this.reg[register] === 0);
+    this.flags.halfCarry = false;
+    this.flags.negative = false;
+    this.flags.carry = false;
 }
 
 CPU.prototype.cbSet = function (bit, register) {
