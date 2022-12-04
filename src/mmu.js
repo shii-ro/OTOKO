@@ -25,7 +25,6 @@ class MMU {
     }
 
     loadRom() {
-        // implement a mapper class later
         let cartType = this.rom[0x147];
         let romSize = this.rom[0x148];
 
@@ -121,7 +120,7 @@ class MMU {
             bankMask: 0,
             cartRead: function (addr) {
                 switch (addr >> 14) {
-                    case 0: return this.rom[addr & 0x3FFF]; // 0x000 - 0x3FFF ROM Bank 00 (Read Only)
+                    case 0: return this.rom[addr]; // 0x000 - 0x3FFF ROM Bank 00 (Read Only)
                     case 1: return this.rom[this.bankMask + addr];// 0x4000 - 0x7FFF - ROM Bank 01-7F (Read Only)
                     case 2: break; // A000-BFFF - RAM Bank 00-03, if any (Read/Write)
                 }
