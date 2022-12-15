@@ -27,15 +27,18 @@ class MMU {
     loadRom() {
         let cartType = this.rom[0x147];
         let romSize = this.rom[0x148];
+        let ramSize = this.rom[0x149];
 
-        console.log(cartType, romSize);
+        console.log(cartType, romSize, ramSize);
 
         switch (cartType) {
             case 0x00: this.cart = this.cartType_NONE; break;
             case 0x01: this.cart = this.cartType_MBC1; break;
+            case 0x03: this.cart = this.cartType_MBC1; break;
             default: this.cart = this.cartType_NONE; break;
         }
         this.cart.rom = this.rom;
+        this.cart.ram = new Uint8Array(0x2000);
 
         // dont judge me
         if (this.biosOff === false) {
@@ -128,17 +131,17 @@ class MMU {
             cartWrite: function (addr, value) {
                 switch (addr >> 12) {
                     case 0: case 1: //0x0000 - 0x1FFF RAM Enable (Write Only)
-                    console.log("Write ram enable");
+                    // console.log("Write ram enable");
                         if ((value & 0xF) === 0xA) {
                             // ram enable...
                         } else { }; break; // ram disable...
                     case 2: case 3: // 0x2000 - 0x3FFF ROM Bank Number (Write Only)
                         let bank = value & 0x1F;
                         this.bankMask = (0x4000 * bank) - 0x4000;
-                        console.log("BANK: ", bank, "MASK: ", this.bankMask.toString(16));
+                        // console.log("BANK: ", bank, "MASK: ", this.bankMask.toString(16));
                         break;
                     case 4: case 5: // 4000-5FFF - RAM Bank Number - or - Upper Bits of ROM Bank Number (Write Only)
-                    console.log("4 5");
+                    // console.log("4 5");
                     break;
 
                 }

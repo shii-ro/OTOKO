@@ -10,8 +10,9 @@ class IO {
 
     write8(address, value) {
         switch (address & 0xFF) {
-            case 0x47: this.ppu.updatePalette(value); break;
-            case 0x42: this.register[0x42] = value; break;
+            case 0x42: this.ppu.reg.scrollY = value; return;
+            case 0x43: this.ppu.reg.scrollX = value; return;
+            case 0x47: this.ppu.updatePalette(value); return;
             case 0x50: if (this.mmu.biosOff === false) { this.mmu.biosOff = true; this.mmu.loadRom(); } break;
             default:
                 this.register[address & 0x7F] = (value & 0xFF);
@@ -22,6 +23,8 @@ class IO {
 
     read8(address) {
         switch (address & 0xFF) {
+            case 0x42: return this.ppu.reg.scrollY;
+            case 0x43: return this.ppu.reg.scrollX;
             default: return this.register[address & 0x7F] & 0xFF;
         }
     }

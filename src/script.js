@@ -95,7 +95,7 @@ function runFrame() {
 
     }
     window.requestAnimationFrame(runFrame);
-    // setTimeout(run, 1);
+    // setTimeout(runFrame, 1);
 }
 
 function run() {
